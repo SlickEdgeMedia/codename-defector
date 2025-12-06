@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:imposter_app/data/auth_repository.dart';
 import 'package:imposter_app/data/room_repository.dart';
@@ -56,10 +57,7 @@ class AppState extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
-    errorMessage = null;
-    loading = true;
-    notifyListeners();
-    try {
+    await _runGuarded(() async {
       final result = await authRepository.register(
         name: name,
         email: email,
@@ -67,31 +65,18 @@ class AppState extends ChangeNotifier {
       );
       await _setToken(result.token);
       user = result.user;
-    } catch (e) {
-      errorMessage = 'Registration failed';
-    } finally {
-      loading = false;
-      notifyListeners();
-    }
+    }, fallbackMessage: 'Registration failed');
   }
 
   Future<void> login({required String email, required String password}) async {
-    errorMessage = null;
-    loading = true;
-    notifyListeners();
-    try {
+    await _runGuarded(() async {
       final result = await authRepository.login(
         email: email,
         password: password,
       );
       await _setToken(result.token);
       user = result.user;
-    } catch (e) {
-      errorMessage = 'Login failed';
-    } finally {
-      loading = false;
-      notifyListeners();
-    }
+    }, fallbackMessage: 'Login failed');
   }
 
   Future<void> logout() async {
@@ -106,18 +91,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> createRoom({required String nickname}) async {
     if (token == null) return;
-    errorMessage = null;
-    loading = true;
-    notifyListeners();
-    try {
+    await _runGuarded(() async {
       final session = await roomRepository.createRoom(nickname: nickname);
       _setRoomSession(session);
-    } catch (e) {
-      errorMessage = 'Failed to create room';
-    } finally {
-      loading = false;
-      notifyListeners();
-    }
+    }, fallbackMessage: 'Failed to create room');
   }
 
   Future<void> joinRoom({
@@ -125,54 +102,38 @@ class AppState extends ChangeNotifier {
     required String nickname,
   }) async {
     if (token == null) return;
-    errorMessage = null;
-    loading = true;
-    notifyListeners();
-    try {
+    await _runGuarded(() async {
       final session = await roomRepository.joinRoom(
         code: code,
         nickname: nickname,
       );
       _setRoomSession(session);
-    } catch (e) {
-      errorMessage = 'Failed to join room';
-    } finally {
-      loading = false;
-      notifyListeners();
-    }
+    }, fallbackMessage: 'Failed to join room');
   }
 
   Future<void> setReady(bool ready) async {
     if (room == null || token == null) return;
-    errorMessage = null;
-    try {
-      final session = await roomRepository.setReady(
-        code: room!.code,
-        ready: ready,
-      );
-      _setRoomSession(session);
-    } catch (e) {
-      errorMessage = 'Failed to update ready state';
-      notifyListeners();
-    }
+    await _runGuarded(
+      () async {
+        final session = await roomRepository.setReady(
+          code: room!.code,
+          ready: ready,
+        );
+        _setRoomSession(session);
+      },
+      fallbackMessage: 'Failed to update ready state',
+      setLoading: false,
+    );
   }
 
   Future<void> leaveRoom() async {
     if (room == null || token == null) return;
-    errorMessage = null;
-    loading = true;
-    notifyListeners();
-    try {
+    await _runGuarded(() async {
       await roomRepository.leaveRoom(room!.code);
       room = null;
       participant = null;
       socketService.disconnect();
-    } catch (e) {
-      errorMessage = 'Failed to leave room';
-    } finally {
-      loading = false;
-      notifyListeners();
-    }
+    }, fallbackMessage: 'Failed to leave room');
   }
 
   Future<void> refreshRoom() async {
@@ -204,5 +165,43 @@ class AppState extends ChangeNotifier {
       roomCode: session.room.code,
       onEvent: (_) => refreshRoom(),
     );
+  }
+
+  Future<void> _runGuarded(
+    Future<void> Function() action, {
+    required String fallbackMessage,
+    bool setLoading = true,
+  }) async {
+    errorMessage = null;
+    if (setLoading) {
+      loading = true;
+      notifyListeners();
+    }
+    try {
+      await action();
+    } catch (e) {
+      errorMessage = _friendlyMessage(e, fallbackMessage);
+    } finally {
+      if (setLoading) {
+        loading = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  String _friendlyMessage(Object error, String fallback) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map && data['message'] is String) {
+        return data['message'] as String;
+      }
+      if (data is Map && data.values.isNotEmpty) {
+        final first = data.values.first;
+        if (first is List && first.isNotEmpty) {
+          return first.first.toString();
+        }
+      }
+    }
+    return fallback;
   }
 }
