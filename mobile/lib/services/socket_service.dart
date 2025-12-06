@@ -53,7 +53,17 @@ class SocketService {
   }
 
   void disconnect() {
-    _socket?.off();
+    _socket?.off('connect');
+    _socket?.off('connect_error');
+    for (final eventName in [
+      'room.created',
+      'room.joined',
+      'room.ready_updated',
+      'room.left',
+      'room.closed',
+    ]) {
+      _socket?.off(eventName);
+    }
     _socket?.disconnect();
     _socket?.close();
     _socket = null;
