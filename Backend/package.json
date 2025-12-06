@@ -4,7 +4,14 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "socket": "node realtime/server.js"
+    },
+    "dependencies": {
+        "@socket.io/redis-adapter": "^8.3.0",
+        "dotenv": "^16.4.5",
+        "ioredis": "^5.4.1",
+        "socket.io": "^4.8.1"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
