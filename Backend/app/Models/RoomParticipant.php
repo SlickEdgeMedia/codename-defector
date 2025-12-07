@@ -13,6 +13,7 @@ class RoomParticipant extends Model
     protected $fillable = [
         'room_id',
         'user_id',
+        'guest_token',
         'nickname',
         'is_host',
         'ready_at',

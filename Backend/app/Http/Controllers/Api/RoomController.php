@@ -27,21 +27,29 @@ class RoomController extends Controller
             'discussion_seconds' => 'sometimes|integer|min:30|max:900',
             'voting_seconds' => 'sometimes|integer|min:10|max:180',
             'max_players' => 'sometimes|integer|min:3|max:12',
+            'category' => 'sometimes|string|min:2|max:50',
+            'round_duration_seconds' => 'sometimes|integer|min:300|max:900',
         ]);
 
-        [$room, $participant] = DB::transaction(function () use ($request, $data) {
+        $actor = $this->actor($request);
+
+        [$room, $participant] = DB::transaction(function () use ($request, $data, $actor) {
             $room = Room::create([
                 'code' => $this->generateUniqueCode(),
-                'host_user_id' => $request->user()->id,
+                'host_user_id' => $actor['type'] === 'user' ? $actor['id'] : null,
+                'host_guest_token' => $actor['type'] === 'guest' ? $actor['token'] : null,
                 'rounds' => $data['rounds'] ?? 4,
                 'discussion_seconds' => $data['discussion_seconds'] ?? 300,
                 'voting_seconds' => $data['voting_seconds'] ?? 60,
                 'max_players' => $data['max_players'] ?? 10,
+                'category' => $data['category'] ?? 'countries',
+                'round_duration_seconds' => $data['round_duration_seconds'] ?? 300,
             ]);
 
             $participant = RoomParticipant::create([
                 'room_id' => $room->id,
-                'user_id' => $request->user()->id,
+                'user_id' => $actor['type'] === 'user' ? $actor['id'] : null,
+                'guest_token' => $actor['type'] === 'guest' ? $actor['token'] : null,
                 'nickname' => $data['nickname'],
                 'is_host' => true,
                 'ready_at' => now(),
@@ -52,6 +60,7 @@ class RoomController extends Controller
 
         $this->publisher->broadcast('room.created', $room, [
             'user_id' => $participant->user_id,
+            'guest_token' => $participant->guest_token,
         ]);
 
         return response()->json([
@@ -62,14 +71,22 @@ class RoomController extends Controller
 
     public function show(Request $request, string $code): RoomResource
     {
+        $actor = $this->actor($request);
+
         $room = Room::query()
             ->where('code', strtoupper($code))
             ->with(['participants.user'])
             ->firstOrFail();
 
-        $isMember = $room->participants->contains(fn ($participant) => $participant->user_id === $request->user()->id);
+        $isMember = $room->participants->contains(function ($participant) use ($actor, $room) {
+            if ($actor['type'] === 'user') {
+                return $participant->user_id === $actor['id'] || $room->host_user_id === $actor['id'];
+            }
 
-        if (! $isMember && $room->host_user_id !== $request->user()->id) {
+            return $participant->guest_token === $actor['token'] || $room->host_guest_token === $actor['token'];
+        });
+
+        if (! $isMember) {
             abort(403, 'You are not a member of this room.');
         }
 
@@ -82,6 +99,8 @@ class RoomController extends Controller
             'nickname' => 'required|string|min:3|max:20',
         ]);
 
+        $actor = $this->actor($request);
+
         $room = Room::where('code', strtoupper($code))->withCount('participants')->firstOrFail();
 
         if ($room->status !== Room::STATUS_LOBBY) {
@@ -89,7 +108,8 @@ class RoomController extends Controller
         }
 
         $existingParticipant = RoomParticipant::where('room_id', $room->id)
-            ->where('user_id', $request->user()->id)
+            ->when($actor['type'] === 'user', fn ($q) => $q->where('user_id', $actor['id']))
+            ->when($actor['type'] === 'guest', fn ($q) => $q->where('guest_token', $actor['token']))
             ->first();
 
         if (! $existingParticipant && $room->participants_count >= $room->max_players) {
@@ -97,10 +117,14 @@ class RoomController extends Controller
         }
 
         $participant = RoomParticipant::updateOrCreate(
-            ['room_id' => $room->id, 'user_id' => $request->user()->id],
+            [
+                'room_id' => $room->id,
+                'user_id' => $actor['type'] === 'user' ? $actor['id'] : null,
+                'guest_token' => $actor['type'] === 'guest' ? $actor['token'] : null,
+            ],
             [
                 'nickname' => $data['nickname'],
-                'is_host' => $request->user()->id === $room->host_user_id,
+                'is_host' => $this->isHost($room, $actor),
             ],
         );
 
@@ -109,6 +133,7 @@ class RoomController extends Controller
 
         $this->publisher->broadcast('room.joined', $room, [
             'user_id' => $participant->user_id,
+            'guest_token' => $participant->guest_token,
         ]);
 
         return response()->json([
@@ -119,10 +144,12 @@ class RoomController extends Controller
 
     public function leave(Request $request, string $code): JsonResponse
     {
+        $actor = $this->actor($request);
         $room = Room::where('code', strtoupper($code))->firstOrFail();
 
         $participant = RoomParticipant::where('room_id', $room->id)
-            ->where('user_id', $request->user()->id)
+            ->when($actor['type'] === 'user', fn ($q) => $q->where('user_id', $actor['id']))
+            ->when($actor['type'] === 'guest', fn ($q) => $q->where('guest_token', $actor['token']))
             ->first();
 
         if (! $participant) {
@@ -131,7 +158,7 @@ class RoomController extends Controller
 
         $participant->delete();
 
-        if ($request->user()->id === $room->host_user_id) {
+        if ($this->isHost($room, $actor)) {
             $room->update(['status' => Room::STATUS_ENDED]);
             $room->participants()->delete();
 
@@ -145,7 +172,8 @@ class RoomController extends Controller
         $room->load(['participants.user']);
 
         $this->publisher->broadcast('room.left', $room, [
-            'user_id' => $request->user()->id,
+            'user_id' => $actor['type'] === 'user' ? $actor['id'] : null,
+            'guest_token' => $actor['type'] === 'guest' ? $actor['token'] : null,
         ]);
 
         return response()->json([
@@ -160,6 +188,7 @@ class RoomController extends Controller
             'ready' => 'required|boolean',
         ]);
 
+        $actor = $this->actor($request);
         $room = Room::where('code', strtoupper($code))->firstOrFail();
 
         if ($room->status !== Room::STATUS_LOBBY) {
@@ -167,7 +196,8 @@ class RoomController extends Controller
         }
 
         $participant = RoomParticipant::where('room_id', $room->id)
-            ->where('user_id', $request->user()->id)
+            ->when($actor['type'] === 'user', fn ($q) => $q->where('user_id', $actor['id']))
+            ->when($actor['type'] === 'guest', fn ($q) => $q->where('guest_token', $actor['token']))
             ->firstOrFail();
 
         $participant->update([
@@ -179,6 +209,7 @@ class RoomController extends Controller
 
         $this->publisher->broadcast('room.ready_updated', $room, [
             'user_id' => $participant->user_id,
+            'guest_token' => $participant->guest_token,
             'ready_at' => optional($participant->ready_at)?->toIso8601String(),
         ]);
 
@@ -196,5 +227,30 @@ class RoomController extends Controller
         } while (Room::where('code', $code)->exists());
 
         return $code;
+    }
+
+    private function actor(Request $request): array
+    {
+        if ($request->attributes->get('user')) {
+            $user = $request->attributes->get('user');
+
+            return ['type' => 'user', 'id' => $user->id, 'name' => $user->name];
+        }
+
+        $guest = $request->attributes->get('guest');
+        if ($guest) {
+            return ['type' => 'guest', 'token' => $guest->token, 'name' => $guest->nickname];
+        }
+
+        abort(401, 'Unauthenticated.');
+    }
+
+    private function isHost(Room $room, array $actor): bool
+    {
+        if ($actor['type'] === 'user') {
+            return $room->host_user_id === $actor['id'];
+        }
+
+        return $room->host_guest_token === ($actor['token'] ?? null);
     }
 }

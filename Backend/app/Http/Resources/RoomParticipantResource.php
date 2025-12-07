@@ -19,6 +19,7 @@ class RoomParticipantResource extends JsonResource
             'id' => $this->id,
             'room_id' => $this->room_id,
             'user_id' => $this->user_id,
+            'guest_token' => $this->guest_token,
             'nickname' => $this->nickname,
             'is_host' => $this->is_host,
             'ready_at' => $this->ready_at?->toIso8601String(),

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Round;
 
 class Room extends Model
 {
@@ -18,11 +19,15 @@ class Room extends Model
     protected $fillable = [
         'code',
         'host_user_id',
+        'host_guest_token',
         'status',
         'max_players',
         'rounds',
         'discussion_seconds',
         'voting_seconds',
+        'category',
+        'round_duration_seconds',
+        'last_active_at',
     ];
 
     protected $casts = [
@@ -31,6 +36,8 @@ class Room extends Model
         'rounds' => 'integer',
         'discussion_seconds' => 'integer',
         'voting_seconds' => 'integer',
+        'round_duration_seconds' => 'integer',
+        'last_active_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -49,5 +56,10 @@ class Room extends Model
     public function participants(): HasMany
     {
         return $this->hasMany(RoomParticipant::class);
+    }
+
+    public function rounds(): HasMany
+    {
+        return $this->hasMany(Round::class);
     }
 }

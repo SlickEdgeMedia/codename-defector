@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
         $middleware->throttleApi('api');
+        $middleware->alias([
+            'auth.mixed' => \App\Http\Middleware\MixedAuth::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

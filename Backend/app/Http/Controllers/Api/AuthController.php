@@ -69,9 +69,28 @@ class AuthController extends Controller
 
     public function introspect(Request $request)
     {
-        return response()->json([
-            'user' => $request->user(),
-            'token_id' => $request->user()?->currentAccessToken()?->id,
-        ]);
+        $user = $request->user();
+
+        if ($user) {
+            return response()->json([
+                'type' => 'user',
+                'user' => $user,
+                'token_id' => $user->currentAccessToken()?->id,
+            ]);
+        }
+
+        $guest = $request->attributes->get('guest');
+
+        if ($guest) {
+            return response()->json([
+                'type' => 'guest',
+                'guest' => [
+                    'nickname' => $guest->nickname,
+                    'token' => $guest->token,
+                ],
+            ]);
+        }
+
+        return response()->json(['message' => 'Unauthenticated.'], 401);
     }
 }
