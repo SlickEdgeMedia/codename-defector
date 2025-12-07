@@ -285,6 +285,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                       color: Color(0xFF6D5240),
                                     ),
                                   ),
+                                  const SizedBox(height: 4),
+                                  _SocketStatusBadge(
+                                    status: state.socketStatus,
+                                    error: state.socketError,
+                                  ),
                                 ],
                               ),
                               TextButton(
@@ -576,6 +581,59 @@ class _Background extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
+    );
+  }
+}
+
+class _SocketStatusBadge extends StatelessWidget {
+  const _SocketStatusBadge({required this.status, this.error});
+
+  final String status;
+  final String? error;
+
+  Color _color() {
+    switch (status) {
+      case 'connected':
+        return const Color(0xFF2E7D32);
+      case 'connecting':
+        return const Color(0xFFF2A93B);
+      case 'error':
+        return const Color(0xFFD84315);
+      default:
+        return const Color(0xFF8A7765);
+    }
+  }
+
+  String _label() {
+    switch (status) {
+      case 'connected':
+        return 'Realtime: connected';
+      case 'connecting':
+        return 'Realtime: connecting...';
+      case 'error':
+        return 'Realtime: error';
+      default:
+        return 'Realtime: offline';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: _color(), shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          error != null && status == 'error'
+              ? '${_label()} (${error})'
+              : _label(),
+          style: const TextStyle(color: Color(0xFF8A7765), fontSize: 12),
+        ),
+      ],
     );
   }
 }

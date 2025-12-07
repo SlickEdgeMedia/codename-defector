@@ -14,6 +14,8 @@ class SocketService {
     required String token,
     required String roomCode,
     required void Function(Map<String, dynamic> event) onEvent,
+    void Function(String status)? onStatus,
+    void Function(String message)? onError,
   }) {
     disconnect();
 
@@ -27,11 +29,21 @@ class SocketService {
           .build(),
     );
 
-    _socket?.on('connect', (_) => debugPrint('Socket connected'));
-    _socket?.on(
-      'connect_error',
-      (error) => debugPrint('Socket connect_error: $error'),
-    );
+    _socket?.on('connect', (_) {
+      debugPrint('Socket connected');
+      onStatus?.call('connected');
+    });
+
+    _socket?.on('disconnect', (_) {
+      debugPrint('Socket disconnected');
+      onStatus?.call('disconnected');
+    });
+
+    _socket?.on('connect_error', (error) {
+      debugPrint('Socket connect_error: $error');
+      onStatus?.call('error');
+      onError?.call(error.toString());
+    });
 
     for (final eventName in [
       'room.created',
@@ -53,6 +65,7 @@ class SocketService {
   }
 
   void disconnect() {
+    _socket?.off('disconnect');
     _socket?.off('connect');
     _socket?.off('connect_error');
     for (final eventName in [

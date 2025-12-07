@@ -27,6 +27,8 @@ class AppState extends ChangeNotifier {
   Room? room;
   RoomParticipant? participant;
   String? errorMessage;
+  String socketStatus = 'disconnected';
+  String? socketError;
 
   Future<void> bootstrap() async {
     final savedToken = prefs.getString('auth_token');
@@ -84,6 +86,8 @@ class AppState extends ChangeNotifier {
     user = null;
     room = null;
     participant = null;
+    socketStatus = 'disconnected';
+    socketError = null;
     socketService.disconnect();
     await prefs.remove('auth_token');
     notifyListeners();
@@ -164,7 +168,19 @@ class AppState extends ChangeNotifier {
       token: token ?? '',
       roomCode: session.room.code,
       onEvent: (_) => refreshRoom(),
+      onStatus: (status) {
+        socketStatus = status;
+        notifyListeners();
+      },
+      onError: (message) {
+        socketError = message;
+        errorMessage = 'Realtime connection lost';
+        notifyListeners();
+      },
     );
+    socketStatus = 'connecting';
+    socketError = null;
+    notifyListeners();
   }
 
   Future<void> _runGuarded(
