@@ -23,7 +23,10 @@ class SocketService {
       env.socketUrl,
       sio.OptionBuilder()
           .setPath(env.socketPath)
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
+          .enableReconnection()
+          .setReconnectionAttempts(0) // unlimited
+          .setTimeout(8000)
           .setAuth({'token': token, 'roomCode': roomCode})
           .disableAutoConnect()
           .build(),
@@ -34,6 +37,14 @@ class SocketService {
       onStatus?.call('connected');
     });
 
+    _socket?.on('reconnect_attempt', (_) {
+      onStatus?.call('connecting');
+    });
+
+    _socket?.on('reconnect', (_) {
+      onStatus?.call('connected');
+    });
+
     _socket?.on('disconnect', (_) {
       debugPrint('Socket disconnected');
       onStatus?.call('disconnected');
@@ -41,6 +52,12 @@ class SocketService {
 
     _socket?.on('connect_error', (error) {
       debugPrint('Socket connect_error: $error');
+      onStatus?.call('error');
+      onError?.call(error.toString());
+    });
+
+    _socket?.on('error', (error) {
+      debugPrint('Socket error: $error');
       onStatus?.call('error');
       onError?.call(error.toString());
     });
