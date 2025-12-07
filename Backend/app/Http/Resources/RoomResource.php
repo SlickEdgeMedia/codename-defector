@@ -27,9 +27,16 @@ class RoomResource extends JsonResource
             'voting_seconds' => $this->voting_seconds,
             'category' => $this->category,
             'round_duration_seconds' => $this->round_duration_seconds,
+            'active_round_id' => $this->activeRound()?->id,
+            'active_round_status' => $this->activeRound()?->status,
             'participants' => RoomParticipantResource::collection($this->whenLoaded('participants')),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function activeRound()
+    {
+        return $this->rounds()->where('status', '!=', 'ended')->latest('id')->first();
     }
 }
