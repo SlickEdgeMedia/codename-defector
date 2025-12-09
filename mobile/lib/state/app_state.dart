@@ -253,9 +253,10 @@ class AppState extends ChangeNotifier {
       if (roundStart.firstQuestionId != null) {
         _pendingPhaseAfterCountdown = 'question';
       }
-      missionStart = startedAt;
-      missionSeconds = _computeRemaining(duration, startedAt);
-      _startMissionTimer(duration, startedAt);
+      final missionStartTime = startedAt.add(Duration(seconds: countdownTotal));
+      missionStart = missionStartTime;
+      missionSeconds = _computeRemaining(duration, missionStartTime);
+      _startMissionTimer(duration, missionStartTime);
       _startCountdown(countdownTotal, onFinished: () {
         roundPhase = _pendingPhaseAfterCountdown ?? 'role';
         _pendingPhaseAfterCountdown = null;
@@ -353,10 +354,10 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  List<RoundQuestionItem> get pendingQuestions {
+    List<RoundQuestionItem> get pendingQuestions {
     if (participant == null) return [];
     return roundQuestions
-        .where((q) => q.targetId == participant!.id && q.answer == null)
+        .where((q) => q.targetId == participant!.id && q.answer == null && q.text.trim().isNotEmpty)
         .toList();
   }
 
@@ -446,9 +447,10 @@ class AppState extends ChangeNotifier {
             _pendingPhaseAfterCountdown = 'question';
           }
           roundPhase = 'countdown';
-          missionStart = startedAt ?? DateTime.now();
-          missionSeconds = _computeRemaining(totalDuration, missionStart!);
-          _startMissionTimer(totalDuration, missionStart!);
+          final missionStartTime = (startedAt ?? DateTime.now()).add(Duration(seconds: countdownDuration));
+          missionStart = missionStartTime;
+          missionSeconds = _computeRemaining(totalDuration, missionStartTime);
+          _startMissionTimer(totalDuration, missionStartTime);
           _startCountdown(remainingCountdown, onFinished: () {
             roundPhase = _pendingPhaseAfterCountdown ?? 'role';
             _pendingPhaseAfterCountdown = null;
@@ -470,20 +472,20 @@ class AppState extends ChangeNotifier {
           notifyListeners();
           break;
         case 'round.question':
+          final text = payload?['text'] as String? ?? '';
+          if (text.trim().isEmpty) break;
           final qId = (payload?['question_id'] as num?)?.toInt() ?? 0;
           currentQuestionId = qId;
           currentAskerId = (payload?['asker_id'] as num?)?.toInt();
           roundPhase = countdownSeconds > 0 ? 'countdown' : 'question';
-          if (payload != null) {
-            _upsertQuestion(RoundQuestionItem(
-              id: qId,
-              askerId: (payload['asker_id'] as num?)?.toInt() ?? 0,
-              targetId: (payload['target_id'] as num?)?.toInt() ?? 0,
-              text: payload['text'] as String? ?? '',
-              askerName: payload['asker_nickname'] as String?,
-              targetName: payload['target_nickname'] as String?,
-            ));
-          }
+          _upsertQuestion(RoundQuestionItem(
+            id: qId,
+            askerId: (payload?['asker_id'] as num?)?.toInt() ?? 0,
+            targetId: (payload?['target_id'] as num?)?.toInt() ?? 0,
+            text: text,
+            askerName: payload?['asker_nickname'] as String?,
+            targetName: payload?['target_nickname'] as String?,
+          ));
           break;
         case 'round.answer':
           if (payload != null) {
@@ -594,17 +596,19 @@ class AppState extends ChangeNotifier {
     final countdownTotal = roomData.countdownSeconds;
     final totalDuration = roomData.roundDurationSeconds;
     final start = roomData.activeRoundStartedAt;
+    final missionStartCandidate = start?.add(Duration(seconds: countdownTotal));
     var updated = false;
 
-    if (start != null && missionStart != start) {
-      missionStart = start;
-      missionSeconds = _computeRemaining(totalDuration, start);
-      _startMissionTimer(totalDuration, start);
+    if (missionStartCandidate != null && missionStart != missionStartCandidate) {
+      missionStart = missionStartCandidate;
+      missionSeconds = _computeRemaining(totalDuration, missionStartCandidate);
+      _startMissionTimer(totalDuration, missionStartCandidate);
       updated = true;
     } else if (missionStart == null) {
-      missionStart = DateTime.now();
-      missionSeconds = _computeRemaining(totalDuration, missionStart!);
-      _startMissionTimer(totalDuration, missionStart!);
+      final fallbackStart = DateTime.now().add(Duration(seconds: countdownTotal));
+      missionStart = fallbackStart;
+      missionSeconds = _computeRemaining(totalDuration, fallbackStart);
+      _startMissionTimer(totalDuration, fallbackStart);
       updated = true;
     } else if (_missionTimer == null && missionStart != null) {
       missionSeconds = _computeRemaining(totalDuration, missionStart!);
@@ -646,27 +650,29 @@ class AppState extends ChangeNotifier {
     currentAskerId = summary.askerId;
     currentQuestionId = summary.id;
 
-    // If we don't already have this question, add it so targets see it in the queue.
-    final exists = roundQuestions.any((q) => q.id == summary.id);
-    if (!exists) {
-      _upsertQuestion(
-        RoundQuestionItem(
-          id: summary.id,
-          askerId: summary.askerId,
-          targetId: summary.targetId,
-          text: summary.text,
-          askerName: room?.participants.firstWhere(
-                    (p) => p.id == summary.askerId,
-                    orElse: () => participant ?? RoomParticipant.empty(),
-                  ).nickname ??
-              '',
-          targetName: room?.participants.firstWhere(
-                    (p) => p.id == summary.targetId,
-                    orElse: () => participant ?? RoomParticipant.empty(),
-                  ).nickname ??
-              '',
-        ),
-      );
+    // Only add to visible questions when text exists; but keep asker/phase for UI.
+    if (summary.text.trim().isNotEmpty) {
+      final exists = roundQuestions.any((q) => q.id == summary.id);
+      if (!exists) {
+        _upsertQuestion(
+          RoundQuestionItem(
+            id: summary.id,
+            askerId: summary.askerId,
+            targetId: summary.targetId,
+            text: summary.text,
+            askerName: room?.participants.firstWhere(
+                      (p) => p.id == summary.askerId,
+                      orElse: () => participant ?? RoomParticipant.empty(),
+                    ).nickname ??
+                '',
+            targetName: room?.participants.firstWhere(
+                      (p) => p.id == summary.targetId,
+                      orElse: () => participant ?? RoomParticipant.empty(),
+                    ).nickname ??
+                '',
+          ),
+        );
+      }
     }
 
     if (roundPhase != 'question' && countdownSeconds <= 0) {
@@ -749,7 +755,9 @@ class AppState extends ChangeNotifier {
   int _computeRemaining(int totalSeconds, DateTime startedAt) {
     final elapsed = DateTime.now().difference(startedAt).inSeconds;
     final remaining = totalSeconds - elapsed;
-    return remaining < 0 ? 0 : remaining;
+    if (remaining < 0) return 0;
+    if (remaining > totalSeconds) return totalSeconds;
+    return remaining;
   }
 
   Future<void> _runGuarded(

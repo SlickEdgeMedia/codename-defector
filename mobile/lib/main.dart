@@ -954,6 +954,11 @@ class _QuestionPhase extends StatelessWidget {
         children: [
           _SectionHeader(label: isMyTurn ? 'Your turn to interrogate' : 'Waiting for next agent'),
           const SizedBox(height: 8),
+          if (state.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _Banner(text: state.errorMessage!, color: Palette.danger),
+            ),
           if (!isMyTurn)
             Text(
               asker != null ? 'Agent ${asker.nickname} is asking' : 'Turn order not started',
