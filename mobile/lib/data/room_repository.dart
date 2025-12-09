@@ -12,6 +12,8 @@ class RoomRepository {
     int? discussionSeconds,
     int? votingSeconds,
     int? maxPlayers,
+    String? category,
+    int? roundDurationSeconds,
   }) async {
     final response = await _api.post<Map<String, dynamic>>(
       '/rooms',
@@ -21,6 +23,9 @@ class RoomRepository {
         if (discussionSeconds != null) 'discussion_seconds': discussionSeconds,
         if (votingSeconds != null) 'voting_seconds': votingSeconds,
         if (maxPlayers != null) 'max_players': maxPlayers,
+        if (category != null) 'category': category,
+        if (roundDurationSeconds != null)
+          'round_duration_seconds': roundDurationSeconds,
       },
     );
 

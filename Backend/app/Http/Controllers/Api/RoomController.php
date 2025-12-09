@@ -76,7 +76,11 @@ class RoomController extends Controller
         $room = Room::query()
             ->where('code', strtoupper($code))
             ->with(['participants.user'])
-            ->firstOrFail();
+            ->first();
+
+        if (! $room) {
+            abort(response()->json(['message' => 'Room not found.'], 404));
+        }
 
         $isMember = $room->participants->contains(function ($participant) use ($actor, $room) {
             if ($actor['type'] === 'user') {
@@ -101,7 +105,11 @@ class RoomController extends Controller
 
         $actor = $this->actor($request);
 
-        $room = Room::where('code', strtoupper($code))->withCount('participants')->firstOrFail();
+        $room = Room::where('code', strtoupper($code))->withCount('participants')->first();
+
+        if (! $room) {
+            return response()->json(['message' => 'Room not found.'], 404);
+        }
 
         if ($room->status !== Room::STATUS_LOBBY) {
             return response()->json(['message' => 'Room is not accepting players.'], 422);
@@ -145,7 +153,11 @@ class RoomController extends Controller
     public function leave(Request $request, string $code): JsonResponse
     {
         $actor = $this->actor($request);
-        $room = Room::where('code', strtoupper($code))->firstOrFail();
+        $room = Room::where('code', strtoupper($code))->first();
+
+        if (! $room) {
+            return response()->json(['message' => 'Room not found.'], 404);
+        }
 
         $participant = RoomParticipant::where('room_id', $room->id)
             ->when($actor['type'] === 'user', fn ($q) => $q->where('user_id', $actor['id']))
@@ -189,7 +201,11 @@ class RoomController extends Controller
         ]);
 
         $actor = $this->actor($request);
-        $room = Room::where('code', strtoupper($code))->firstOrFail();
+        $room = Room::where('code', strtoupper($code))->first();
+
+        if (! $room) {
+            return response()->json(['message' => 'Room not found.'], 404);
+        }
 
         if ($room->status !== Room::STATUS_LOBBY) {
             return response()->json(['message' => 'Cannot toggle ready outside lobby.'], 422);

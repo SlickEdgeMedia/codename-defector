@@ -4,6 +4,8 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Models\Round;
+use App\Models\RoundQuestion;
 
 /** @mixin \App\Models\Room */
 class RoomResource extends JsonResource
@@ -15,6 +17,14 @@ class RoomResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $activeRound = $this->activeRound();
+        $currentQuestion = $activeRound
+            ? RoundQuestion::where('round_id', $activeRound->id)
+                ->where('status', 'in_progress')
+                ->orderByDesc('asked_at')
+                ->first()
+            : null;
+
         return [
             'id' => $this->id,
             'code' => $this->code,
@@ -27,8 +37,19 @@ class RoomResource extends JsonResource
             'voting_seconds' => $this->voting_seconds,
             'category' => $this->category,
             'round_duration_seconds' => $this->round_duration_seconds,
-            'active_round_id' => $this->activeRound()?->id,
-            'active_round_status' => $this->activeRound()?->status,
+            'active_round_id' => $activeRound?->id,
+            'active_round_status' => $activeRound?->status,
+            'active_round_number' => $activeRound?->round_number,
+            'active_round_started_at' => $activeRound?->started_at?->toIso8601String(),
+            'current_question' => $currentQuestion ? [
+                'id' => $currentQuestion->id,
+                'asker_id' => $currentQuestion->asker_participant_id,
+                'target_id' => $currentQuestion->target_participant_id,
+                'text' => $currentQuestion->text,
+                'order' => $currentQuestion->order,
+                'status' => $currentQuestion->status,
+            ] : null,
+            'countdown_seconds' => Round::COUNTDOWN_SECONDS,
             'participants' => RoomParticipantResource::collection($this->whenLoaded('participants')),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

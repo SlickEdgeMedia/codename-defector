@@ -14,6 +14,8 @@ return new class extends Migration
             $table->foreignId('asker_participant_id')->constrained('room_participants')->cascadeOnDelete();
             $table->foreignId('target_participant_id')->constrained('room_participants')->cascadeOnDelete();
             $table->text('text');
+            $table->unsignedInteger('order')->default(0);
+            $table->enum('status', ['pending', 'in_progress', 'answered'])->default('pending');
             $table->timestamp('asked_at')->nullable();
             $table->timestamps();
         });

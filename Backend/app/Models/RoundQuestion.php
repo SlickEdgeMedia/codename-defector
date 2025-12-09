@@ -16,6 +16,8 @@ class RoundQuestion extends Model
         'asker_participant_id',
         'target_participant_id',
         'text',
+        'order',
+        'status',
         'asked_at',
     ];
 

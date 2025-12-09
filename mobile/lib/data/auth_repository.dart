@@ -44,4 +44,13 @@ class AuthRepository {
     final response = await _api.get<Map<String, dynamic>>('/auth/introspect');
     return AuthResult.fromIntrospection(response.data ?? {});
   }
+
+  Future<AuthResult> guest({required String nickname}) async {
+    final response = await _api.post<Map<String, dynamic>>(
+      '/guest',
+      data: {'nickname': nickname},
+    );
+
+    return AuthResult.fromGuest(response.data ?? {});
+  }
 }

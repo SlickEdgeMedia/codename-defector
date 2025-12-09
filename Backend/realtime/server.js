@@ -14,8 +14,15 @@ const allowedOrigins = process.env.SOCKET_ALLOWED_ORIGINS
     : ['*'];
 
 const httpServer = createServer();
-const pubClient = new Redis(redisUrl);
+const pubClient = new Redis(redisUrl, { maxRetriesPerRequest: null });
 const subClient = pubClient.duplicate();
+
+const logRedisError = (label) => (error) => {
+    console.error(`[redis:${label}]`, error?.message ?? error);
+};
+
+pubClient.on('error', logRedisError('pub'));
+subClient.on('error', logRedisError('sub'));
 
 const io = new Server(httpServer, {
     path: socketPath,
@@ -47,6 +54,7 @@ subClient.on('message', (channel, message) => {
             return;
         }
 
+        console.log(`Redis event -> emit ${event.type} to room:${event.room_code}`);
         io.to(getRoomChannel(event.room_code)).emit(event.type, event);
     } catch (error) {
         console.error('Failed to process room event', error);
@@ -66,19 +74,24 @@ io.use(async (socket, next) => {
             throw new Error('Missing room code');
         }
 
-        const user = await validateToken(token);
-        const room = await fetchRoomMembership(roomCode, token, user.id);
+        const actor = await validateToken(token);
+        const room = await fetchRoomMembership(roomCode, token, actor);
 
         if (!room) {
             throw new Error('Not a member of this room');
         }
 
-        socket.data.user = user;
+        socket.data.actor = actor;
         socket.data.roomCode = room.code;
         socket.data.token = token;
 
+        console.log(
+            `Auth ok for socket ${socket.id} room=${room.code} actor=${actor.type}:${actor.type === 'user' ? actor.id : actor.token?.slice(0, 6) + '...'}`,
+        );
+
         return next();
     } catch (error) {
+        console.error('Auth failed', error?.message ?? error);
         return next(error);
     }
 });
@@ -87,9 +100,11 @@ io.on('connection', (socket) => {
     const roomChannel = getRoomChannel(socket.data.roomCode);
     socket.join(roomChannel);
 
+    console.log(`Socket ${socket.id} joined ${roomChannel}`);
+
     socket.emit('connected', {
         room_code: socket.data.roomCode,
-        user_id: socket.data.user.id,
+        actor: socket.data.actor,
     });
 
     socket.on('disconnect', (reason) => {
@@ -114,45 +129,60 @@ function extractToken(socket) {
 function extractRoomCode(socket) {
     const code = socket.handshake.auth?.roomCode ?? socket.handshake.query.roomCode;
 
-    return typeof code === 'string' ? code.toUpperCase() : '';
+  return typeof code === 'string' ? code.toUpperCase() : '';
 }
 
 async function validateToken(token) {
-    const response = await fetch(`${apiBaseUrl}/auth/introspect`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-        },
-    });
+  const response = await fetch(`${apiBaseUrl}/auth/introspect`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
 
-    if (!response.ok) {
-        throw new Error(`Token rejected (${response.status})`);
-    }
+  if (!response.ok) {
+    throw new Error(`Token rejected (${response.status})`);
+  }
 
-    const payload = await response.json();
+  const payload = await response.json();
 
-    return payload.user;
+  if (payload.type === 'user' && payload.user) {
+    return { type: 'user', id: payload.user.id, name: payload.user.name };
+  }
+
+  if (payload.type === 'guest' && payload.guest) {
+    return { type: 'guest', token: payload.guest.token, nickname: payload.guest.nickname };
+  }
+
+  throw new Error('Invalid token payload');
 }
 
-async function fetchRoomMembership(roomCode, token, userId) {
-    const response = await fetch(`${apiBaseUrl}/rooms/${roomCode}`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-        },
-    });
+async function fetchRoomMembership(roomCode, token, actor) {
+  const response = await fetch(`${apiBaseUrl}/rooms/${roomCode}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
 
-    if (!response.ok) {
-        return null;
+  if (!response.ok) {
+    console.error(`Room fetch failed ${response.status}`);
+    return null;
+  }
+
+  const body = await response.json();
+  const room = body?.data ?? body; // handle Laravel resource wrapper
+  const participants = room?.participants ?? [];
+  const isMember = participants.some((participant) => {
+    if (actor.type === 'user') {
+      return participant.user_id === actor.id;
     }
+    return participant.guest_token === actor.token;
+  });
 
-    const room = await response.json();
-    const participants = room.participants ?? [];
-    const isMember = participants.some((participant) => participant.user_id === userId);
-
-    return isMember ? room : null;
+  return isMember ? room : null;
 }
 
 function getRoomChannel(roomCode) {
-    return `room:${roomCode}`;
+  return `room:${roomCode}`;
 }

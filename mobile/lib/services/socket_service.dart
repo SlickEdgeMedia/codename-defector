@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:imposter_app/config/env.dart';
 import 'package:socket_io_client/socket_io_client.dart' as sio;
@@ -62,14 +60,25 @@ class SocketService {
       onError?.call(error.toString());
     });
 
-    for (final eventName in [
+    final events = [
       'room.created',
       'room.joined',
       'room.ready_updated',
       'room.left',
       'room.closed',
-    ]) {
+      'round.started',
+      'round.phase',
+      'round.question_turn',
+      'round.question',
+      'round.answer',
+      'round.votes_updated',
+      'round.imposter_guess',
+      'round.results',
+    ];
+
+    for (final eventName in events) {
       _socket?.on(eventName, (data) {
+        debugPrint('SOCKET EVENT: $eventName');
         if (data is Map<String, dynamic>) {
           onEvent(data);
         } else if (data is Map) {
@@ -91,6 +100,14 @@ class SocketService {
       'room.ready_updated',
       'room.left',
       'room.closed',
+      'round.started',
+      'round.phase',
+      'round.question_turn',
+      'round.question',
+      'round.answer',
+      'round.votes_updated',
+      'round.imposter_guess',
+      'round.results',
     ]) {
       _socket?.off(eventName);
     }

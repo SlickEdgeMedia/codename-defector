@@ -11,6 +11,7 @@ class Round extends Model
 {
     use HasFactory;
 
+    public const COUNTDOWN_SECONDS = 5;
     public const STATUS_PENDING = 'pending';
     public const STATUS_COUNTDOWN = 'countdown';
     public const STATUS_IN_PROGRESS = 'in_progress';

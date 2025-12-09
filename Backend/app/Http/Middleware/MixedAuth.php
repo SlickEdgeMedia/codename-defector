@@ -14,15 +14,26 @@ class MixedAuth
         $user = $request->user();
 
         if (! $user) {
-            $guestToken = $this->extractToken($request);
-            if ($guestToken) {
-                $guest = GuestToken::where('token', $guestToken)->first();
-                if ($guest) {
-                    $guest->forceFill(['last_used_at' => now()])->saveQuietly();
-                    $request->attributes->set('guest', $guest);
+            // Try to resolve a Sanctum personal access token manually
+            $bearer = $this->extractToken($request);
+            if ($bearer) {
+                $accessToken = PersonalAccessToken::findToken($bearer);
+                if ($accessToken && $accessToken->tokenable) {
+                    $user = $accessToken->tokenable;
+                    $user->withAccessToken($accessToken);
+                    $request->setUserResolver(fn () => $user);
+                } else {
+                    // Fallback: treat as guest token if found
+                    $guest = GuestToken::where('token', $bearer)->first();
+                    if ($guest) {
+                        $guest->forceFill(['last_used_at' => now()])->saveQuietly();
+                        $request->attributes->set('guest', $guest);
+                    }
                 }
             }
-        } else {
+        }
+
+        if ($user) {
             $request->attributes->set('user', $user);
         }
 
