@@ -25,6 +25,20 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
   double _durationMinutes = 10;
   int _categoryIndex = 0;
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final state = context.watch<AppState>();
+    // Pre-fill nickname from user or guest login
+    final defaultNickname = state.user?.name ?? state.guestNickname ?? '';
+    if (_hostCodename.text.isEmpty && defaultNickname.isNotEmpty) {
+      _hostCodename.text = defaultNickname;
+    }
+    if (_joinCodename.text.isEmpty && defaultNickname.isNotEmpty) {
+      _joinCodename.text = defaultNickname;
+    }
+  }
+
   List<Map<String, String>> get categories => const [
         {'slug': 'countries', 'label': 'Countries'},
         {'slug': 'animals', 'label': 'Animals'},
@@ -41,7 +55,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
       appBar: AppBar(
         backgroundColor: Palette.bg,
         elevation: 0,
-        title: const Text('IMPOSTER'),
+        title: const Text('THE SPY'),
         actions: [
           TextButton(
             onPressed: () => state.logout(),

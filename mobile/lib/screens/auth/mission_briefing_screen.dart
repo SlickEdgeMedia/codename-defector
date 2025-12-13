@@ -54,7 +54,7 @@ class _MissionBriefingScreenState extends State<MissionBriefingScreen> {
                     const Text('TOP SECRET', style: TextStyle(color: Palette.gold, letterSpacing: 4)),
                     const SizedBox(height: 8),
                     Text(
-                      'IMPOSTER',
+                      'THE SPY',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                             letterSpacing: 4,

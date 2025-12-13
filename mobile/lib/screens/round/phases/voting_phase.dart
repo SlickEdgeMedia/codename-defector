@@ -43,7 +43,7 @@ class _VotingPhaseState extends State<VotingPhase> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isImposter) ...[
-            SectionHeader(label: 'Imposter options'),
+            SectionHeader(label: 'Spy options'),
             const SizedBox(height: 8),
             const Text(
               'Select the word to win',
@@ -81,7 +81,7 @@ class _VotingPhaseState extends State<VotingPhase> {
                     },
             ),
           ] else ...[
-            SectionHeader(label: 'Identify imposter'),
+            SectionHeader(label: 'Identify the spy'),
             const SizedBox(height: 8),
           ],
           if (!isImposter) ...[

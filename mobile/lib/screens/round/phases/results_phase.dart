@@ -40,7 +40,7 @@ class ResultsPhase extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  imposterWon ? 'IMPOSTER WINS' : 'CIVILIANS WIN',
+                  imposterWon ? 'SPY WINS' : 'CIVILIANS WIN',
                   style: TextStyle(
                     color: imposterWon ? Palette.danger : Palette.success,
                     fontSize: 20,
@@ -79,7 +79,7 @@ class ResultsPhase extends StatelessWidget {
                       title: Text(s.nickname),
                       subtitle: Text(
                         s.participantId == results.imposterParticipantId
-                            ? 'Imposter'
+                            ? 'Spy'
                             : 'Civilian',
                         style: const TextStyle(color: Palette.muted),
                       ),

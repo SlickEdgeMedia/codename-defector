@@ -40,7 +40,7 @@ class RoleStrip extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isImposter ? 'IMPOSTER' : 'CIVILIAN',
+                  isImposter ? 'SPY' : 'CIVILIAN',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: accent,
@@ -87,7 +87,7 @@ class RolePhase extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isImposter ? 'IMPOSTER' : 'CIVILIAN',
+            isImposter ? 'SPY' : 'CIVILIAN',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: isImposter ? Palette.danger : Palette.gold,
                   fontWeight: FontWeight.w800,

@@ -55,7 +55,7 @@ class MyApp extends StatelessWidget {
     return ChangeNotifierProvider.value(
       value: appState,
       child: MaterialApp(
-        title: 'Imposter',
+        title: 'The Spy',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
             seedColor: Palette.gold,
