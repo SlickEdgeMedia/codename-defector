@@ -19,6 +19,12 @@ class _GuestLoginScreenState extends State<GuestLoginScreen> {
   final _guestName = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _guestName.addListener(() => setState(() {}));
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
 

@@ -20,6 +20,14 @@ class _AgentRegisterScreenState extends State<AgentRegisterScreen> {
   final _password = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _name.addListener(() => setState(() {}));
+    _email.addListener(() => setState(() {}));
+    _password.addListener(() => setState(() {}));
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
 
