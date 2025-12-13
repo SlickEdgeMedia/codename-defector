@@ -1,25 +1,53 @@
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:imposter_app/constants/palette.dart';
 import 'package:imposter_app/state/app_state.dart';
 import 'package:imposter_app/widgets/buttons/secondary_mission_button.dart';
 import 'package:imposter_app/widgets/headers/section_header.dart';
 
-/// Results phase widget showing scoring and mission outcome.
-class ResultsPhase extends StatelessWidget {
+/// Results phase widget showing scoring and mission outcome with celebration.
+class ResultsPhase extends StatefulWidget {
   const ResultsPhase({super.key, required this.state});
 
   final AppState state;
 
   @override
+  State<ResultsPhase> createState() => _ResultsPhaseState();
+}
+
+class _ResultsPhaseState extends State<ResultsPhase> {
+  late ConfettiController _confettiController;
+
+  @override
+  void initState() {
+    super.initState();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+    // Start confetti on load
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _confettiController.play();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final results = state.roundResults;
+    final results = widget.state.roundResults;
     // Imposter wins if they guessed the word correctly
     final imposterWon = results != null && results.imposterGuessedCorrectly;
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           // Mission outcome banner
           Container(
             width: double.infinity,
@@ -122,15 +150,37 @@ class ResultsPhase extends StatelessWidget {
           // Action buttons
           SecondaryMissionButton(
             label: 'Refresh results',
-            onTap: () => state.fetchResults(),
+            onTap: () => widget.state.fetchResults(),
           ),
           const SizedBox(height: 8),
           SecondaryMissionButton(
             label: 'Return to lobby',
-            onTap: () => state.returnToLobby(),
+            onTap: () => widget.state.returnToLobby(),
           ),
-        ],
-      ),
+            ],
+          ),
+        ),
+        // Confetti overlay
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConfettiWidget(
+            confettiController: _confettiController,
+            blastDirectionality: BlastDirectionality.explosive,
+            particleDrag: 0.05,
+            emissionFrequency: 0.05,
+            numberOfParticles: 30,
+            gravity: 0.2,
+            shouldLoop: false,
+            colors: const [
+              Palette.gold,
+              Palette.success,
+              Palette.danger,
+              Colors.blue,
+              Colors.purple,
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

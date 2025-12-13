@@ -38,6 +38,7 @@ dependencies:
   socket_io_client: ^2.0.3
   provider: ^6.1.2
   google_fonts: ^6.2.1
+  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:
