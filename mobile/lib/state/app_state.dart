@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:imposter_app/constants/game_constants.dart';
 import 'package:imposter_app/data/auth_repository.dart';
 import 'package:imposter_app/data/room_repository.dart';
 import 'package:imposter_app/data/round_repository.dart';
@@ -8,8 +11,11 @@ import 'package:imposter_app/models/round_models.dart';
 import 'package:imposter_app/models/user.dart';
 import 'package:imposter_app/services/socket_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
 
+/// Main application state manager.
+///
+/// Manages authentication, room/lobby state, round gameplay, and WebSocket connections.
+/// Uses Provider's ChangeNotifier pattern to notify UI of state changes.
 class AppState extends ChangeNotifier {
   AppState({
     required this.authRepository,
@@ -19,58 +25,93 @@ class AppState extends ChangeNotifier {
     required this.prefs,
   });
 
+  // ============================================================================
+  // Dependencies
+  // ============================================================================
+
   final AuthRepository authRepository;
   final RoomRepository roomRepository;
   final RoundRepository roundRepository;
   final SocketService socketService;
   final SharedPreferences prefs;
 
+  // ============================================================================
+  // Authentication State
+  // ============================================================================
+
   bool loading = false;
-  bool roundLoading = false;
   String? token;
   UserProfile? user;
   String? guestNickname;
+
+  // ============================================================================
+  // Room/Lobby State
+  // ============================================================================
+
   Room? room;
   RoomParticipant? participant;
   String? errorMessage;
   String? bannerMessage;
-  String socketStatus = 'disconnected';
+
+  // ============================================================================
+  // WebSocket State
+  // ============================================================================
+
+  String socketStatus = SocketStatus.disconnected;
   String? socketError;
   String? socketRoomCode;
+  List<String> eventLog = [];
+
+  // ============================================================================
+  // Round State
+  // ============================================================================
+
+  bool roundLoading = false;
   int? activeRoundId;
   String? activeRoundStatus;
   RoundRoleInfo? roundRole;
   RoundResults? roundResults;
+  int? resultsRoundId; // Track which round results are being shown
+  bool showRound = true;
+
+  // Round Phase Management
+  String roundPhase = GamePhases.role;
+  int countdownSeconds = TimingDefaults.countdownSeconds;
+  String? _pendingPhaseAfterCountdown;
+
+  // Question/Answer State
   List<RoundQuestionItem> roundQuestions = [];
-  Map<int, int> voteTotals = {};
-  Map<int, String> notes = {};
-  bool askedQuestion = false;
-  bool voted = false;
-  bool guessSubmitted = false;
-  Set<String> crossedWords = {};
   int? currentQuestionId;
   int? currentAskerId;
-  List<String> eventLog = [];
+  bool askedQuestion = false;
+
+  // Voting State
+  Map<int, int> voteTotals = {};
+  bool voted = false;
+  bool readyForVoting = false;
+  int readyForVotingCount = 0;
+  bool allQuestionsAnswered = false;
+
+  // Imposter State
+  bool guessSubmitted = false;
+  Set<String> crossedWords = {};
+  Map<int, String> notes = {};
+
+  // ============================================================================
+  // Timers
+  // ============================================================================
+
   Timer? _pollTimer;
-  bool showRound = true;
-  String roundPhase = 'role'; // countdown | role | question | voting | results
-  int countdownSeconds = 5;
-  String? _pendingPhaseAfterCountdown;
   Timer? _countdownTimer;
+  Timer? _missionTimer;
   int? missionSeconds;
   DateTime? missionStart;
-  Timer? _missionTimer;
 
-  void _setSocketStatus(String status, {String? error}) {
-    socketStatus = status;
-    if (error != null) {
-      socketError = error;
-    } else if (status != 'disconnected') {
-      socketError = null;
-    }
-    notifyListeners();
-  }
+  // ============================================================================
+  // Authentication Methods
+  // ============================================================================
 
+  /// Initialize app state from persisted token.
   Future<void> bootstrap() async {
     final savedToken = prefs.getString('auth_token');
     if (savedToken != null && savedToken.isNotEmpty) {
@@ -79,6 +120,7 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Refresh user session from server.
   Future<void> refreshSession() async {
     if (token == null) return;
     try {
@@ -96,6 +138,7 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Register a new user account.
   Future<void> register({
     required String name,
     required String email,
@@ -152,6 +195,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ============================================================================
+  // Room/Lobby Methods
+  // ============================================================================
+
+  /// Create a new room and join as host.
   Future<void> createRoom({
     required String nickname,
     required String category,
@@ -230,11 +278,16 @@ class AppState extends ChangeNotifier {
     roundQuestions = [];
     voteTotals = {};
     showRound = false;
-    roundPhase = 'role';
+    roundPhase = GamePhases.role;
     notifyListeners();
     await refreshRoom();
   }
 
+  // ============================================================================
+  // Round Methods
+  // ============================================================================
+
+  /// Start a new round (host only).
   Future<void> startRound() async {
     if (room == null) return;
     await _runGuarded(() async {
@@ -332,6 +385,43 @@ class AppState extends ChangeNotifier {
     }, fallbackMessage: 'Vote failed', setLoading: false);
   }
 
+  Future<void> guessWord({required int wordId}) async {
+    print('🟠 guessWord called, wordId: $wordId, activeRoundId: $activeRoundId');
+    if (activeRoundId == null) {
+      print('🔴 guessWord: No active round ID');
+      return;
+    }
+    await _runGuarded(() async {
+      print('🟡 guessWord: Calling backend API...');
+      await roundRepository.imposterGuess(roundId: activeRoundId!, wordId: wordId);
+      print('🟢 guessWord: Backend call succeeded');
+      guessSubmitted = true;
+    }, fallbackMessage: 'Guess failed', setLoading: false);
+  }
+
+  Future<void> skipVote() async {
+    print('🟠 skipVote called, activeRoundId: $activeRoundId');
+    if (activeRoundId == null) {
+      print('🔴 skipVote: No active round ID');
+      return;
+    }
+    await _runGuarded(() async {
+      print('🟡 skipVote: Calling backend API...');
+      await roundRepository.skipGuess(roundId: activeRoundId!);
+      print('🟢 skipVote: Backend call succeeded');
+      voted = true;
+      guessSubmitted = true;
+    }, fallbackMessage: 'Skip failed', setLoading: false);
+  }
+
+  Future<void> markReadyForVoting() async {
+    if (activeRoundId == null) return;
+    await _runGuarded(() async {
+      await roundRepository.markReadyForVoting(roundId: activeRoundId!);
+      readyForVoting = true;
+    }, fallbackMessage: 'Could not mark ready', setLoading: false);
+  }
+
   Future<void> submitGuess(int wordId) async {
     if (activeRoundId == null) return;
     await _runGuarded(() async {
@@ -344,14 +434,29 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> fetchResults([int? roundId]) async {
-    final id = roundId ?? activeRoundId;
-    if (id == null) return;
-    try {
-      roundResults = await roundRepository.fetchResults(id);
-      notifyListeners();
-    } catch (_) {
-      // ignore
+    // Use provided roundId, or fallback to resultsRoundId (for refresh), or activeRoundId
+    final id = roundId ?? resultsRoundId ?? activeRoundId;
+    if (id == null) {
+      print('🔴 fetchResults: No round ID available (roundId=$roundId, resultsRoundId=$resultsRoundId, activeRoundId=$activeRoundId)');
+      return;
     }
+    try {
+      print('🟡 fetchResults: Fetching results for round $id');
+      roundResults = await roundRepository.fetchResults(id);
+      resultsRoundId = id; // Remember which round results we're showing
+      print('🟢 fetchResults: Success! Scores: ${roundResults?.scores.length ?? 0}, Cumulative: ${roundResults?.cumulativeScores.length ?? 0}');
+      notifyListeners();
+    } catch (e, stackTrace) {
+      print('🔴 fetchResults: Error - $e');
+      print('🔴 Stack trace: $stackTrace');
+    }
+  }
+
+  void returnToLobby() {
+    showRound = false;
+    roundPhase = 'role';
+    resultsRoundId = null;
+    notifyListeners();
   }
 
     List<RoundQuestionItem> get pendingQuestions {
@@ -415,10 +520,15 @@ class AppState extends ChangeNotifier {
         _setSocketStatus('error', error: message);
       },
     );
-    _setSocketStatus('connecting');
+    _setSocketStatus(SocketStatus.connecting);
     _startPolling();
   }
 
+  // ============================================================================
+  // WebSocket Event Handling
+  // ============================================================================
+
+  /// Handle incoming socket events and update state accordingly.
   void _handleSocketEvent(Map<String, dynamic> event) {
     final type = event['type'] as String?;
     final payload = (event['payload'] as Map?)?.cast<String, dynamic>();
@@ -436,8 +546,8 @@ class AppState extends ChangeNotifier {
           final startedAt = payload?['started_at'] != null ? DateTime.tryParse(payload?['started_at']) : null;
           final countdownDuration = (payload?['countdown_seconds'] as num?)?.toInt() ?? room?.countdownSeconds ?? 5;
           final firstQuestion = (payload?['first_question'] as Map?)?.cast<String, dynamic>();
-          final elapsed = startedAt != null ? DateTime.now().difference(startedAt).inSeconds : 0;
-          final remainingCountdown = (countdownDuration - elapsed).clamp(0, countdownDuration);
+          // Always start with full countdown - ignore elapsed time to avoid countdown being 0
+          final remainingCountdown = countdownDuration;
           final totalDuration = duration ?? room?.roundDurationSeconds ?? 300;
           _resetRoundState(roundId: id, status: 'in_progress');
           showRound = true;
@@ -495,6 +605,17 @@ class AppState extends ChangeNotifier {
             );
           }
           break;
+        case 'round.all_questions_answered':
+          allQuestionsAnswered = true;
+          print('🔥 DEBUG: ALL QUESTIONS ANSWERED EVENT RECEIVED');
+          print('🔥 DEBUG: allQuestionsAnswered = $allQuestionsAnswered');
+          print('🔥 DEBUG: roundPhase = $roundPhase');
+          break;
+        case 'round.ready_for_voting':
+          if (payload != null) {
+            readyForVotingCount = (payload['ready_count'] as num?)?.toInt() ?? 0;
+          }
+          break;
         case 'round.votes_updated':
           roundPhase = 'voting';
           if (payload != null) {
@@ -505,14 +626,22 @@ class AppState extends ChangeNotifier {
           final phase = payload?['phase'] as String? ?? '';
           if (phase.isNotEmpty) {
             roundPhase = phase;
+            if (phase == 'voting') {
+              readyForVoting = false;
+              readyForVotingCount = 0;
+            }
           }
           break;
         case 'round.imposter_guess':
           guessSubmitted = true;
           break;
         case 'round.results':
+          print('🔵 SOCKET: round.results received');
+          print('🔵 Payload: $payload');
           roundPhase = 'results';
-          fetchResults((payload?['round_id'] as num?)?.toInt());
+          final roundId = (payload?['round_id'] as num?)?.toInt();
+          print('🔵 Extracted round_id: $roundId');
+          fetchResults(roundId);
           break;
       }
       notifyListeners();
@@ -547,12 +676,22 @@ class AppState extends ChangeNotifier {
     final newStatus = latest.activeRoundStatus;
     final idChanged = newId != activeRoundId;
 
+    // If round ended (newId becomes null) while we're showing results, keep showing results
+    if (idChanged && newId == null && roundPhase == 'results') {
+      // Don't reset - keep showing results screen
+      return;
+    }
+
     if (idChanged) {
       _resetRoundState(roundId: newId, status: newStatus);
     } else {
       activeRoundStatus = newStatus;
       if (newStatus == 'in_progress' && roundPhase == 'role') {
         roundPhase = 'countdown';
+      }
+      // If round is scoring or ended, show results
+      if (newStatus == 'scoring' || newStatus == 'ended') {
+        roundPhase = 'results';
       }
     }
 
@@ -572,6 +711,7 @@ class AppState extends ChangeNotifier {
     activeRoundStatus = status;
     roundRole = null;
     roundResults = null;
+    resultsRoundId = null;
     roundQuestions = [];
     voteTotals = {};
     notes = {};
@@ -579,6 +719,9 @@ class AppState extends ChangeNotifier {
     voted = false;
     guessSubmitted = false;
     crossedWords = {};
+    allQuestionsAnswered = false;
+    readyForVoting = false;
+    readyForVotingCount = 0;
     currentAskerId = null;
     currentQuestionId = null;
     _pendingPhaseAfterCountdown = null;
@@ -619,7 +762,9 @@ class AppState extends ChangeNotifier {
     final elapsed = start != null ? DateTime.now().difference(start).inSeconds : 0;
     final remainingCountdown = (countdownTotal - elapsed).clamp(0, countdownTotal);
 
-    if (roundPhase != 'countdown' && remainingCountdown > 0) {
+    // Only force countdown phase if we're in 'role' phase and countdown hasn't started yet
+    // NEVER force back to countdown from question/voting/results phases
+    if (roundPhase == 'role' && remainingCountdown > 0) {
       roundPhase = 'countdown';
       updated = true;
     }
@@ -697,6 +842,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ============================================================================
+  // Helper Methods & Utilities
+  // ============================================================================
+
+  /// Start periodic polling to refresh room state.
+  void _setSocketStatus(String status, {String? error}) {
+    socketStatus = status;
+    if (error != null) {
+      socketError = error;
+    } else if (status != SocketStatus.disconnected) {
+      socketError = null;
+    }
+    notifyListeners();
+  }
+
+  /// Start periodic polling to refresh room state.
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {

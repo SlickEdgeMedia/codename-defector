@@ -124,12 +124,16 @@ class RoundResults {
     required this.status,
     required this.imposterParticipantId,
     required this.scores,
+    this.cumulativeScores = const {},
+    this.imposterGuessedCorrectly = false,
   });
 
   final int roundId;
   final String status;
   final int? imposterParticipantId;
   final List<RoundScoreEntry> scores;
+  final Map<int, int> cumulativeScores; // participantId -> total points
+  final bool imposterGuessedCorrectly;
 
   factory RoundResults.fromJson(Map<String, dynamic> json) {
     final scores = (json['scores'] as List<dynamic>?)
@@ -137,11 +141,27 @@ class RoundResults {
             .map(RoundScoreEntry.fromJson)
             .toList() ??
         [];
+
+    // Parse cumulative scores - backend sends as Map<String, int>
+    final cumulativeRaw = json['cumulative_scores'];
+    final Map<int, int> cumulative = {};
+    if (cumulativeRaw != null && cumulativeRaw is Map) {
+      cumulativeRaw.forEach((key, value) {
+        final participantId = key is int ? key : int.tryParse(key.toString());
+        final points = value is int ? value : (value as num?)?.toInt() ?? 0;
+        if (participantId != null) {
+          cumulative[participantId] = points;
+        }
+      });
+    }
+
     return RoundResults(
       roundId: (json['round_id'] as num?)?.toInt() ?? 0,
       status: json['status'] as String? ?? '',
       imposterParticipantId: (json['imposter_participant_id'] as num?)?.toInt(),
       scores: scores,
+      cumulativeScores: cumulative,
+      imposterGuessedCorrectly: json['imposter_guessed_correctly'] as bool? ?? false,
     );
   }
 }

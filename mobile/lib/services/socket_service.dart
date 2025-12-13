@@ -71,8 +71,11 @@ class SocketService {
       'round.question_turn',
       'round.question',
       'round.answer',
+      'round.all_questions_answered',
+      'round.ready_for_voting',
       'round.votes_updated',
       'round.imposter_guess',
+      'round.imposter_skip',
       'round.results',
     ];
 
@@ -105,8 +108,11 @@ class SocketService {
       'round.question_turn',
       'round.question',
       'round.answer',
+      'round.all_questions_answered',
+      'round.ready_for_voting',
       'round.votes_updated',
       'round.imposter_guess',
+      'round.imposter_skip',
       'round.results',
     ]) {
       _socket?.off(eventName);

@@ -25,8 +25,15 @@ class Round extends Model
         'category_id',
         'word_id',
         'imposter_participant_id',
+        'current_turn_participant_id',
+        'current_turn_phase',
+        'turn_time_remaining_seconds',
+        'turn_timer_started_at',
         'status',
         'round_duration_seconds',
+        'round_time_remaining_seconds',
+        'round_timer_started_at',
+        'voting_unlocked',
         'started_at',
         'ended_at',
     ];
@@ -34,6 +41,9 @@ class Round extends Model
     protected $casts = [
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
+        'round_timer_started_at' => 'datetime',
+        'turn_timer_started_at' => 'datetime',
+        'voting_unlocked' => 'boolean',
     ];
 
     public function room(): BelongsTo

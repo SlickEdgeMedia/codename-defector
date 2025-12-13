@@ -259,8 +259,10 @@ class RoundController extends Controller
                 'order' => $next->order,
             ]);
         } else {
-            // all asked -> move to voting
-            $round->update(['status' => Round::STATUS_VOTING]);
+            // All questions answered - transition to voting phase automatically
+            $round->status = Round::STATUS_VOTING;
+            $round->save();
+
             $this->publisher->broadcast('round.phase', $round->room, [
                 'round_id' => $round->id,
                 'phase' => 'voting',
@@ -278,9 +280,54 @@ class RoundController extends Controller
         return response()->json(['message' => 'Answered', 'id' => $answer->id], 201);
     }
 
+    public function readyForVoting(Request $request, int $roundId): JsonResponse
+    {
+        $round = Round::with(['room.participants'])->findOrFail($roundId);
+        $actor = $this->actor($request);
+        $participant = $this->participant($round->room, $actor);
+
+        // Mark participant as ready for voting
+        $participant->ready_for_voting_at = now();
+        $participant->save();
+
+        // Refresh participants to get updated ready status
+        $round->room->load('participants');
+
+        // Broadcast ready status
+        $this->publisher->broadcast('round.ready_for_voting', $round->room, [
+            'round_id' => $round->id,
+            'participant_id' => $participant->id,
+            'nickname' => $participant->nickname,
+            'ready_count' => $round->room->participants->whereNotNull('ready_for_voting_at')->count(),
+            'total_count' => $round->room->participants->count(),
+        ]);
+
+        // Check if all participants are ready
+        $allReady = $round->room->participants->every(fn($p) => $p->ready_for_voting_at !== null);
+
+        if ($allReady) {
+            // Reset ready status and transition to voting
+            $round->room->participants->each(function ($p) {
+                $p->ready_for_voting_at = null;
+                $p->save();
+            });
+
+            // Transition to voting phase
+            $round->status = Round::STATUS_VOTING;
+            $round->save();
+
+            $this->publisher->broadcast('round.phase', $round->room, [
+                'round_id' => $round->id,
+                'phase' => 'voting',
+            ]);
+        }
+
+        return response()->json(['message' => 'Marked as ready', 'all_ready' => $allReady]);
+    }
+
     public function vote(Request $request, int $roundId): JsonResponse
     {
-        $round = Round::with(['room'])->findOrFail($roundId);
+        $round = Round::with(['room.participants'])->findOrFail($roundId);
         $actor = $this->actor($request);
         $participant = $this->participant($round->room, $actor);
 
@@ -329,6 +376,19 @@ class RoundController extends Controller
             'totals' => $totals,
         ]);
 
+        // Check if all civilians have voted (excluding imposter)
+        $civilians = $round->room->participants->where('id', '!=', $round->imposter_participant_id);
+        $civilianVotes = RoundVote::where('round_id', $round->id)->count();
+        $allCiviliansVoted = $civilianVotes >= $civilians->count();
+
+        // Check if imposter has guessed or skipped
+        $imposterGuessed = ImposterGuess::where('round_id', $round->id)->exists();
+
+        if ($allCiviliansVoted && $imposterGuessed) {
+            // All civilians voted AND imposter guessed/skipped - transition to results
+            $this->scoreRound($round);
+        }
+
         return response()->json(['message' => 'Vote recorded', 'id' => $vote->id], 201);
     }
 
@@ -368,7 +428,60 @@ class RoundController extends Controller
             'word_text' => Word::find($data['word_id'])?->text,
         ]);
 
+        // Check if all civilians have voted
+        $round->load('room.participants');
+        $civilians = $round->room->participants->where('id', '!=', $round->imposter_participant_id);
+        $civilianVotes = RoundVote::where('round_id', $round->id)->count();
+        $allCiviliansVoted = $civilianVotes >= $civilians->count();
+
+        if ($allCiviliansVoted) {
+            // All civilians voted AND imposter guessed - transition to results
+            $this->scoreRound($round);
+        }
+
         return response()->json(['message' => 'Guess recorded', 'correct' => $correct, 'id' => $guess->id], 201);
+    }
+
+    public function skipGuess(Request $request, int $roundId): JsonResponse
+    {
+        $round = Round::with('room.participants')->findOrFail($roundId);
+        $actor = $this->actor($request);
+        $participant = $this->participant($round->room, $actor);
+
+        if ($round->imposter_participant_id !== $participant->id) {
+            return response()->json(['message' => 'Only imposter can skip'], 403);
+        }
+
+        // Check if already guessed or skipped
+        $existing = ImposterGuess::where('round_id', $round->id)->first();
+        if ($existing) {
+            return response()->json(['message' => 'Already guessed/skipped this round'], 422);
+        }
+
+        // Create a "skip" record (word_id = null, correct = false)
+        $guess = ImposterGuess::create([
+            'round_id' => $round->id,
+            'imposter_participant_id' => $participant->id,
+            'word_id' => null,
+            'correct' => false,
+            'guessed_at' => now(),
+        ]);
+
+        $this->publisher->broadcast('round.imposter_skip', $round->room, [
+            'round_id' => $round->id,
+        ]);
+
+        // Check if all civilians have voted
+        $civilians = $round->room->participants->where('id', '!=', $round->imposter_participant_id);
+        $civilianVotes = RoundVote::where('round_id', $round->id)->count();
+        $allCiviliansVoted = $civilianVotes >= $civilians->count();
+
+        if ($allCiviliansVoted) {
+            // All civilians voted AND imposter skipped - transition to results
+            $this->scoreRound($round);
+        }
+
+        return response()->json(['message' => 'Skipped', 'id' => $guess->id], 201);
     }
 
     public function results(Request $request, int $roundId): JsonResponse
@@ -381,6 +494,7 @@ class RoundController extends Controller
             $this->scoreRound($round);
         }
 
+        // Get current round scores
         $scores = RoundScore::where('round_id', $round->id)
             ->with('participant')
             ->get()
@@ -393,11 +507,32 @@ class RoundController extends Controller
                 ];
             });
 
+        // Calculate cumulative scores for all participants in this room across all rounds
+        $cumulativeScores = RoundScore::select('participant_id')
+            ->selectRaw('SUM(points) as total_points')
+            ->whereIn('round_id', function ($query) use ($round) {
+                $query->select('id')
+                    ->from('rounds')
+                    ->where('room_id', $round->room_id);
+            })
+            ->groupBy('participant_id')
+            ->get()
+            ->mapWithKeys(function ($item) {
+                return [$item->participant_id => (int)$item->total_points];
+            })
+            ->toArray();
+
+        // Check if imposter guessed the word correctly
+        $imposterGuess = ImposterGuess::where('round_id', $round->id)->first();
+        $imposterGuessedCorrectly = $imposterGuess && $imposterGuess->word_id !== null && $imposterGuess->correct;
+
         return response()->json([
             'round_id' => $round->id,
             'status' => $round->status,
             'scores' => $scores,
+            'cumulative_scores' => $cumulativeScores,
             'imposter_participant_id' => $round->imposter_participant_id,
+            'imposter_guessed_correctly' => $imposterGuessedCorrectly,
         ]);
     }
 
@@ -451,63 +586,46 @@ class RoundController extends Controller
 
             $imposterId = $round->imposter_participant_id;
             $votes = RoundVote::where('round_id', $round->id)->get();
-            $totalVoters = $votes->count();
-            $scores = [];
-
             $imposterVotes = $votes->where('target_participant_id', $imposterId);
 
-            foreach ($votes as $vote) {
-                $isCorrect = $vote->target_participant_id === $imposterId;
-                $scores[] = [
-                    'round_id' => $round->id,
-                    'participant_id' => $vote->voter_participant_id,
-                    'points' => $isCorrect ? 3 : -1,
-                    'reason' => $isCorrect ? 'correct_vote' : 'incorrect_vote',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+            // Track points per participant
+            $participantPoints = [];
 
-                if (! $isCorrect) {
-                    $scores[] = [
-                        'round_id' => $round->id,
-                        'participant_id' => $imposterId,
-                        'points' => 1,
-                        'reason' => 'others_incorrect_vote',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
+            // Score civilians based on their votes
+            foreach ($votes as $vote) {
+                $voterId = $vote->voter_participant_id;
+                $isCorrect = $vote->target_participant_id === $imposterId;
+
+                // Civilian gets points for their vote
+                $participantPoints[$voterId] = ($participantPoints[$voterId] ?? 0) + ($isCorrect ? 5 : -1);
+
+                // Imposter gets +1 for each wrong vote against others
+                if (!$isCorrect) {
+                    $participantPoints[$imposterId] = ($participantPoints[$imposterId] ?? 0) + 1;
                 }
             }
 
-            // Imposter word guess
+            // Score imposter's word guess
             $guess = ImposterGuess::where('round_id', $round->id)->first();
-            $wordGuessPoints = 0;
-            if ($guess) {
-                $wordGuessPoints = $guess->correct ? 3 : -3;
+            if ($guess && $guess->word_id !== null) {
+                // Only score if they actually guessed (not skipped)
+                $participantPoints[$imposterId] = ($participantPoints[$imposterId] ?? 0) + ($guess->correct ? 3 : -2);
+            }
+
+            // Create one score entry per participant with total points
+            $scores = [];
+            foreach ($participantPoints as $participantId => $points) {
                 $scores[] = [
                     'round_id' => $round->id,
-                    'participant_id' => $imposterId,
-                    'points' => $wordGuessPoints,
-                    'reason' => $guess->correct ? 'imposter_correct_guess' : 'imposter_wrong_guess',
+                    'participant_id' => $participantId,
+                    'points' => $points,
+                    'reason' => $participantId === $imposterId ? 'imposter_total' : 'civilian_total',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
             }
 
-            // Bonus for civilians wrong votes already captured; now imposter bonus for not being suspected
-            $notSuspected = $totalVoters - $imposterVotes->count();
-            if ($notSuspected > 0) {
-                $scores[] = [
-                    'round_id' => $round->id,
-                    'participant_id' => $imposterId,
-                    'points' => $notSuspected,
-                    'reason' => 'not_suspected_bonus',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-
-            if (! empty($scores)) {
+            if (!empty($scores)) {
                 RoundScore::insert($scores);
             }
 

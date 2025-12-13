@@ -84,9 +84,32 @@ class RoundRepository {
     );
   }
 
+  Future<void> guessWord({
+    required int roundId,
+    required String guess,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/rounds/$roundId/guess',
+      data: {'guess': guess},
+    );
+  }
+
+  Future<void> markReadyForVoting({required int roundId}) async {
+    await _api.post<Map<String, dynamic>>(
+      '/rounds/$roundId/ready-for-voting',
+    );
+  }
+
+  Future<void> skipGuess({required int roundId}) async {
+    await _api.post<Map<String, dynamic>>(
+      '/rounds/$roundId/skip-guess',
+    );
+  }
+
   Future<RoundResults> fetchResults(int roundId) async {
     final response =
         await _api.get<Map<String, dynamic>>('/rounds/$roundId/results');
+    print('🔵 fetchResults API response: ${response.data}');
     return RoundResults.fromJson(response.data ?? {});
   }
 }
