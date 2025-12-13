@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:imposter_app/constants/palette.dart';
+import 'package:imposter_app/utils/haptics.dart';
 
-/// Secondary action button with gold outline.
+/// Secondary action button with gold outline and haptic feedback.
 ///
 /// Used for secondary actions like "Cancel", "View History", etc.
 class SecondaryMissionButton extends StatelessWidget {
@@ -25,7 +26,12 @@ class SecondaryMissionButton extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           foregroundColor: Palette.gold,
         ),
-        onPressed: onTap,
+        onPressed: onTap == null
+            ? null
+            : () {
+                Haptics.light();
+                onTap?.call();
+              },
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
     );

@@ -1,0 +1,159 @@
+import 'package:flutter/material.dart';
+import 'package:imposter_app/constants/palette.dart';
+import 'package:imposter_app/state/app_state.dart';
+import 'package:imposter_app/widgets/buttons/primary_mission_button.dart';
+import 'package:imposter_app/widgets/containers/mission_banner.dart';
+import 'package:imposter_app/widgets/containers/mission_panel.dart';
+import 'package:provider/provider.dart';
+
+/// Agent registration screen for creating new accounts.
+class AgentRegisterScreen extends StatefulWidget {
+  const AgentRegisterScreen({super.key});
+
+  @override
+  State<AgentRegisterScreen> createState() => _AgentRegisterScreenState();
+}
+
+class _AgentRegisterScreenState extends State<AgentRegisterScreen> {
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0A0B11), Color(0xFF0F1119)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                // Back button
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Palette.gold),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'NEW RECRUIT',
+                            style: TextStyle(
+                              color: Palette.gold,
+                              letterSpacing: 4,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'THE SPY',
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 4,
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'REGISTRATION',
+                            style: TextStyle(color: Palette.muted, letterSpacing: 2),
+                          ),
+                          const SizedBox(height: 32),
+                          MissionPanel(
+                            title: 'Create profile',
+                            child: Column(
+                              children: [
+                                TextField(
+                                  controller: _name,
+                                  autofocus: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Name',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _email,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _password,
+                                  obscureText: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Password',
+                                  ),
+                                  onSubmitted: (_) {
+                                    if (_name.text.trim().isNotEmpty &&
+                                        _email.text.trim().isNotEmpty &&
+                                        _password.text.isNotEmpty &&
+                                        !state.loading) {
+                                      state.register(
+                                        name: _name.text.trim(),
+                                        email: _email.text.trim(),
+                                        password: _password.text,
+                                      );
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                PrimaryMissionButton(
+                                  label: state.loading ? 'Registering...' : 'Register',
+                                  onTap: state.loading ||
+                                          _name.text.trim().isEmpty ||
+                                          _email.text.trim().isEmpty ||
+                                          _password.text.isEmpty
+                                      ? null
+                                      : () => state.register(
+                                            name: _name.text.trim(),
+                                            email: _email.text.trim(),
+                                            password: _password.text,
+                                          ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (state.errorMessage != null) ...[
+                            const SizedBox(height: 16),
+                            MissionBanner(text: state.errorMessage!, color: Palette.danger),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+}

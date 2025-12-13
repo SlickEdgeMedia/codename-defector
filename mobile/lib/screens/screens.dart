@@ -4,6 +4,9 @@
 
 // Auth screens
 export 'auth/mission_briefing_screen.dart';
+export 'auth/guest_login_screen.dart';
+export 'auth/agent_login_screen.dart';
+export 'auth/agent_register_screen.dart';
 
 // Setup screens
 export 'setup/mission_setup_screen.dart';

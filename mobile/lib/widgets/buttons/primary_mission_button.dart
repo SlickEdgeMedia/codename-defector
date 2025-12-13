@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:imposter_app/constants/palette.dart';
+import 'package:imposter_app/utils/haptics.dart';
 
-/// Primary action button with gold background.
+/// Primary action button with gold background and haptic feedback.
 ///
 /// Used for main CTAs like "Start Mission", "Submit Answer", etc.
 class PrimaryMissionButton extends StatelessWidget {
@@ -25,7 +26,12 @@ class PrimaryMissionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
-        onPressed: onTap,
+        onPressed: onTap == null
+            ? null
+            : () {
+                Haptics.medium();
+                onTap?.call();
+              },
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
