@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:imposter_app/constants/avatars.dart';
 import 'package:imposter_app/constants/palette.dart';
 import 'package:imposter_app/models/room.dart';
 import 'package:imposter_app/state/app_state.dart';
@@ -17,6 +18,12 @@ class MissionLobbyScreen extends StatelessWidget {
   const MissionLobbyScreen({super.key});
 
   bool _everyoneReady(Room room) => room.participants.every((p) => p.readyAt != null);
+
+  // Assign a consistent avatar based on participant ID
+  SpyAvatar _getAvatarForParticipant(int participantId) {
+    final avatars = SpyAvatar.values;
+    return avatars[participantId % avatars.length];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +87,7 @@ class MissionLobbyScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   ...room.participants.map((p) {
                     final ready = p.readyAt != null;
+                    final avatar = _getAvatarForParticipant(p.id);
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -90,13 +98,9 @@ class MissionLobbyScreen extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(
-                            backgroundColor: Palette.primary.withAlpha(51),
-                            foregroundColor: Palette.primaryBright,
-                            child: Text(
-                              p.nickname.isNotEmpty ? p.nickname[0].toUpperCase() : 'A',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
+                          AvatarIcon(
+                            avatar: avatar,
+                            size: 40,
                           ),
                           const SizedBox(width: 12),
                           Expanded(

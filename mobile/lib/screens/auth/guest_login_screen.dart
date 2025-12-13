@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:imposter_app/constants/avatars.dart';
 import 'package:imposter_app/constants/palette.dart';
 import 'package:imposter_app/state/app_state.dart';
+import 'package:imposter_app/widgets/avatar_selector.dart';
 import 'package:imposter_app/widgets/buttons/primary_mission_button.dart';
 import 'package:imposter_app/widgets/buttons/secondary_mission_button.dart';
 import 'package:imposter_app/widgets/containers/mission_banner.dart';
@@ -17,6 +19,7 @@ class GuestLoginScreen extends StatefulWidget {
 
 class _GuestLoginScreenState extends State<GuestLoginScreen> {
   final _guestName = TextEditingController();
+  SpyAvatar _selectedAvatar = SpyAvatar.agent;
 
   @override
   void initState() {
@@ -101,7 +104,16 @@ class _GuestLoginScreenState extends State<GuestLoginScreen> {
                                     }
                                   },
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 20),
+                                AvatarSelector(
+                                  selectedAvatar: _selectedAvatar,
+                                  onAvatarSelected: (avatar) {
+                                    setState(() {
+                                      _selectedAvatar = avatar;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(height: 20),
                                 PrimaryMissionButton(
                                   label: state.loading ? 'Joining...' : 'Confirm',
                                   onTap: state.loading || _guestName.text.trim().isEmpty
