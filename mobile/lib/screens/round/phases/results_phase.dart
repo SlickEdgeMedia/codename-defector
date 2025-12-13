@@ -176,15 +176,16 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
     final results = widget.state.roundResults;
     final imposterWon = results != null && results.imposterGuessedCorrectly;
 
-    // Find top scorer(s) for this round
+    // Find top scorer(s) for this round and their role
     List<String> topScorers = [];
     int maxScore = 0;
+    bool topScorerIsSpy = false;
     if (results != null && results.scores.isNotEmpty) {
       maxScore = results.scores.map((s) => s.points).reduce((a, b) => a > b ? a : b);
-      topScorers = results.scores
-          .where((s) => s.points == maxScore)
-          .map((s) => s.nickname)
-          .toList();
+      final topScorersList = results.scores.where((s) => s.points == maxScore).toList();
+      topScorers = topScorersList.map((s) => s.nickname).toList();
+      // Check if any top scorer is the spy
+      topScorerIsSpy = topScorersList.any((s) => s.participantId == results.imposterParticipantId);
     }
 
     // Build sorted leaderboard for total scores
@@ -214,7 +215,7 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: imposterWon
+                    colors: topScorerIsSpy
                         ? [Palette.danger.withOpacity(0.2), Palette.danger.withOpacity(0.1)]
                         : [Palette.success.withOpacity(0.2), Palette.success.withOpacity(0.1)],
                     begin: Alignment.topLeft,
@@ -222,12 +223,12 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
                   ),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: imposterWon ? Palette.danger : Palette.success,
+                    color: topScorerIsSpy ? Palette.danger : Palette.success,
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: (imposterWon ? Palette.danger : Palette.success).withOpacity(0.2),
+                      color: (topScorerIsSpy ? Palette.danger : Palette.success).withOpacity(0.2),
                       blurRadius: 12,
                       spreadRadius: 2,
                     ),
@@ -237,8 +238,8 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      imposterWon ? Icons.dangerous : Icons.shield_moon,
-                      color: imposterWon ? Palette.danger : Palette.success,
+                      topScorerIsSpy ? Icons.dangerous : Icons.shield_moon,
+                      color: topScorerIsSpy ? Palette.danger : Palette.success,
                       size: 48,
                     ),
                     const SizedBox(width: 16),
@@ -247,9 +248,9 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            imposterWon ? 'SPY' : 'CIVILIANS',
+                            topScorerIsSpy ? 'SPY' : 'CIVILIAN',
                             style: TextStyle(
-                              color: imposterWon ? Palette.danger : Palette.success,
+                              color: topScorerIsSpy ? Palette.danger : Palette.success,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 1.5,
@@ -262,7 +263,7 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
                                   ? topScorers[0]
                                   : topScorers.join(' & '),
                               style: TextStyle(
-                                color: imposterWon ? Palette.danger : Palette.success,
+                                color: topScorerIsSpy ? Palette.danger : Palette.success,
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -271,7 +272,7 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
                           Text(
                             maxScore > 0 ? '+$maxScore points' : '$maxScore points',
                             style: TextStyle(
-                              color: (imposterWon ? Palette.danger : Palette.success).withOpacity(0.7),
+                              color: (topScorerIsSpy ? Palette.danger : Palette.success).withOpacity(0.7),
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
