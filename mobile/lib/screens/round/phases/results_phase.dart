@@ -72,6 +72,7 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
     required SpyAvatar avatar,
     required Color scoreColor,
     bool isPositive = false,
+    int? rank,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -81,19 +82,42 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: scoreColor.withOpacity(0.3),
-          width: 1.5,
+          width: rank == 1 ? 2 : 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: scoreColor.withOpacity(0.1),
-            blurRadius: 8,
-            spreadRadius: 1,
+            color: scoreColor.withOpacity(rank == 1 ? 0.2 : 0.1),
+            blurRadius: rank == 1 ? 12 : 8,
+            spreadRadius: rank == 1 ? 2 : 1,
           ),
         ],
       ),
       child: Row(
         children: [
-          // Avatar on LEFT
+          // Rank badge for leaderboard
+          if (rank != null) ...[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: scoreColor.withOpacity(0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: scoreColor, width: 1.5),
+              ),
+              child: Center(
+                child: Text(
+                  rank == 1 ? '🏆' : '$rank',
+                  style: TextStyle(
+                    color: scoreColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: rank == 1 ? 16 : 14,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          // Avatar
           AvatarIcon(
             avatar: avatar,
             size: 44,
@@ -150,8 +174,18 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final results = widget.state.roundResults;
-    // Imposter wins if they guessed the word correctly
     final imposterWon = results != null && results.imposterGuessedCorrectly;
+
+    // Find top scorer(s) for this round
+    List<String> topScorers = [];
+    int maxScore = 0;
+    if (results != null && results.scores.isNotEmpty) {
+      maxScore = results.scores.map((s) => s.points).reduce((a, b) => a > b ? a : b);
+      topScorers = results.scores
+          .where((s) => s.points == maxScore)
+          .map((s) => s.nickname)
+          .toList();
+    }
 
     // Build sorted leaderboard for total scores
     List<_LeaderboardEntry> sortedLeaderboard = [];
@@ -164,7 +198,7 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
           totalPoints: totalPoints,
         );
       }).toList()
-        ..sort((a, b) => b.totalPoints.compareTo(a.totalPoints)); // Sort by total points descending
+        ..sort((a, b) => b.totalPoints.compareTo(a.totalPoints));
     }
 
     return Stack(
@@ -174,7 +208,7 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Mission outcome banner
+              // Mission outcome banner - Show winner(s) with icon
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -199,21 +233,50 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
                     ),
                   ],
                 ),
-                child: Column(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
                       imposterWon ? Icons.dangerous : Icons.shield_moon,
                       color: imposterWon ? Palette.danger : Palette.success,
-                      size: 56,
+                      size: 48,
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      imposterWon ? 'SPY WINS' : 'CIVILIANS WIN',
-                      style: TextStyle(
-                        color: imposterWon ? Palette.danger : Palette.success,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 2,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            imposterWon ? 'SPY' : 'CIVILIANS',
+                            style: TextStyle(
+                              color: imposterWon ? Palette.danger : Palette.success,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (topScorers.isNotEmpty)
+                            Text(
+                              topScorers.length == 1
+                                  ? topScorers[0]
+                                  : topScorers.join(' & '),
+                              style: TextStyle(
+                                color: imposterWon ? Palette.danger : Palette.success,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          const SizedBox(height: 2),
+                          Text(
+                            maxScore > 0 ? '+$maxScore points' : '$maxScore points',
+                            style: TextStyle(
+                              color: (imposterWon ? Palette.danger : Palette.success).withOpacity(0.7),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -264,40 +327,39 @@ class _ResultsPhaseState extends State<ResultsPhase> with TickerProviderStateMix
 
               const SizedBox(height: 24),
 
-              // Total scores section with animated leaderboard
+              // Total scores section with ranking
               if (results != null && results.cumulativeScores.isNotEmpty) ...[
                 SectionHeader(label: 'Leaderboard'),
                 const SizedBox(height: 12),
-                // Animated leaderboard
-                AnimatedList(
-                  key: _listKey,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  initialItemCount: sortedLeaderboard.length,
-                  itemBuilder: (context, index, animation) {
-                    final entry = sortedLeaderboard[index];
-                    final avatar = _getAvatarForParticipant(entry.participantId);
+                Column(
+                  children: sortedLeaderboard.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final leaderboardEntry = entry.value;
+                    final rank = index + 1;
+                    final avatar = _getAvatarForParticipant(leaderboardEntry.participantId);
 
-                    return SlideTransition(
-                      position: animation.drive(
-                        Tween<Offset>(
-                          begin: const Offset(0, 0.3),
-                          end: Offset.zero,
-                        ).chain(CurveTween(curve: Curves.easeOut)),
-                      ),
-                      child: FadeTransition(
-                        opacity: animation,
-                        child: _buildScoreCard(
-                          name: entry.nickname,
-                          subtitle: 'Total points',
-                          score: entry.totalPoints,
-                          avatar: avatar,
-                          scoreColor: index == 0 ? Palette.gold : Palette.primary,
-                          isPositive: false,
-                        ),
-                      ),
+                    // Gold for 1st, silver for 2nd, bronze for 3rd, purple for rest
+                    Color scoreColor;
+                    if (rank == 1) {
+                      scoreColor = Palette.gold;
+                    } else if (rank == 2) {
+                      scoreColor = const Color(0xFFC0C0C0); // Silver
+                    } else if (rank == 3) {
+                      scoreColor = const Color(0xFFCD7F32); // Bronze
+                    } else {
+                      scoreColor = Palette.primary;
+                    }
+
+                    return _buildScoreCard(
+                      name: leaderboardEntry.nickname,
+                      subtitle: 'Total points',
+                      score: leaderboardEntry.totalPoints,
+                      avatar: avatar,
+                      scoreColor: scoreColor,
+                      isPositive: false,
+                      rank: rank,
                     );
-                  },
+                  }).toList(),
                 ),
                 const SizedBox(height: 24),
               ],

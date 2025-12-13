@@ -25,11 +25,11 @@ class Palette {
   /// Darker cyan for secondary accents
   static const Color accentDark = Color(0xFF00D9C0);
 
-  /// Legacy gold color (kept for backwards compatibility, gradually replace with primary)
-  static const Color gold = Color(0xFF9D4EDD);
+  /// Gold color for 1st place / winners
+  static const Color gold = Color(0xFFFFD700);
 
   /// Legacy goldDark (kept for backwards compatibility)
-  static const Color goldDark = Color(0xFF7B2CBF);
+  static const Color goldDark = Color(0xFFD4A017);
 
   /// Primary text color (near white)
   static const Color text = Color(0xFFF5F5F5);
