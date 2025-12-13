@@ -24,19 +24,41 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
   String _category = 'countries';
   double _durationMinutes = 10;
   int _categoryIndex = 0;
+  bool _hasInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listeners to rebuild when text changes
+    _hostCodename.addListener(() => setState(() {}));
+    _joinCodename.addListener(() => setState(() {}));
+    _joinCode.addListener(() => setState(() {}));
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final state = context.watch<AppState>();
-    // Pre-fill nickname from user or guest login
-    final defaultNickname = state.user?.name ?? state.guestNickname ?? '';
-    if (_hostCodename.text.isEmpty && defaultNickname.isNotEmpty) {
-      _hostCodename.text = defaultNickname;
+    // Only pre-fill once
+    if (!_hasInitialized) {
+      _hasInitialized = true;
+      final state = context.watch<AppState>();
+      // Pre-fill nickname from user or guest login
+      final defaultNickname = state.user?.name ?? state.guestNickname ?? '';
+      if (_hostCodename.text.isEmpty && defaultNickname.isNotEmpty) {
+        _hostCodename.text = defaultNickname;
+      }
+      if (_joinCodename.text.isEmpty && defaultNickname.isNotEmpty) {
+        _joinCodename.text = defaultNickname;
+      }
     }
-    if (_joinCodename.text.isEmpty && defaultNickname.isNotEmpty) {
-      _joinCodename.text = defaultNickname;
-    }
+  }
+
+  @override
+  void dispose() {
+    _hostCodename.dispose();
+    _joinCodename.dispose();
+    _joinCode.dispose();
+    super.dispose();
   }
 
   List<Map<String, String>> get categories => const [
