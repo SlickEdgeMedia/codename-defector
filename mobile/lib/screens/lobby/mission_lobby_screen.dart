@@ -59,7 +59,7 @@ class MissionLobbyScreen extends StatelessWidget {
                 child: MissionBanner(text: state.errorMessage!, color: Palette.danger),
               ),
             MissionPanel(
-              title: 'Room ${room.code}',
+              title: 'Safehouse ${room.code}',
               subtitle: 'Status: ${room.status}',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,7 +161,7 @@ class MissionLobbyScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: SecondaryMissionButton(
-                    label: 'Leave mission',
+                    label: 'Leave safehouse',
                     onTap: () => state.leaveRoom(),
                   ),
                 ),

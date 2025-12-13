@@ -97,7 +97,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
             Column(
               children: [
                 MissionPanel(
-                  title: 'Host mission',
+                  title: 'Create safehouse',
                   subtitle: 'Configure operation parameters',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,7 +160,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
                       ),
                       const SizedBox(height: 12),
                       PrimaryMissionButton(
-                        label: state.loading ? 'Creating...' : 'Create mission',
+                        label: state.loading ? 'Creating...' : 'Create safehouse',
                         onTap: state.loading
                             ? null
                             : () => state.createRoom(
@@ -174,7 +174,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
                 ),
                 const SizedBox(height: 12),
                 MissionPanel(
-                  title: 'Join mission',
+                  title: 'Join safehouse',
                   subtitle: 'Enter access code',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,7 +190,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
                       ),
                       const SizedBox(height: 12),
                       SecondaryMissionButton(
-                        label: state.loading ? 'Joining...' : 'Join mission',
+                        label: state.loading ? 'Joining...' : 'Join safehouse',
                         onTap: state.loading
                             ? null
                             : () => state.joinRoom(
