@@ -92,9 +92,12 @@ class _GuestLoginScreenState extends State<GuestLoginScreen> {
                                     labelText: 'Enter your codename',
                                     hintText: 'Agent007',
                                   ),
-                                  onSubmitted: (_) {
+                                  onSubmitted: (_) async {
                                     if (_guestName.text.trim().isNotEmpty && !state.loading) {
-                                      state.guestLogin(nickname: _guestName.text.trim());
+                                      await state.guestLogin(nickname: _guestName.text.trim());
+                                      if (mounted && state.token != null) {
+                                        Navigator.pop(context);
+                                      }
                                     }
                                   },
                                 ),
@@ -103,7 +106,12 @@ class _GuestLoginScreenState extends State<GuestLoginScreen> {
                                   label: state.loading ? 'Joining...' : 'Confirm',
                                   onTap: state.loading || _guestName.text.trim().isEmpty
                                       ? null
-                                      : () => state.guestLogin(nickname: _guestName.text.trim()),
+                                      : () async {
+                                          await state.guestLogin(nickname: _guestName.text.trim());
+                                          if (mounted && state.token != null) {
+                                            Navigator.pop(context);
+                                          }
+                                        },
                                 ),
                               ],
                             ),

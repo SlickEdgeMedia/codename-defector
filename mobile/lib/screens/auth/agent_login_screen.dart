@@ -101,14 +101,17 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                                   decoration: const InputDecoration(
                                     labelText: 'Password',
                                   ),
-                                  onSubmitted: (_) {
+                                  onSubmitted: (_) async {
                                     if (_email.text.trim().isNotEmpty &&
                                         _password.text.isNotEmpty &&
                                         !state.loading) {
-                                      state.login(
+                                      await state.login(
                                         email: _email.text.trim(),
                                         password: _password.text,
                                       );
+                                      if (mounted && state.token != null) {
+                                        Navigator.pop(context);
+                                      }
                                     }
                                   },
                                 ),
@@ -119,10 +122,15 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                                           _email.text.trim().isEmpty ||
                                           _password.text.isEmpty
                                       ? null
-                                      : () => state.login(
+                                      : () async {
+                                          await state.login(
                                             email: _email.text.trim(),
                                             password: _password.text,
-                                          ),
+                                          );
+                                          if (mounted && state.token != null) {
+                                            Navigator.pop(context);
+                                          }
+                                        },
                                 ),
                               ],
                             ),

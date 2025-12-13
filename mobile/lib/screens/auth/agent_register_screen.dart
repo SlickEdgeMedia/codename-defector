@@ -110,16 +110,19 @@ class _AgentRegisterScreenState extends State<AgentRegisterScreen> {
                                   decoration: const InputDecoration(
                                     labelText: 'Password',
                                   ),
-                                  onSubmitted: (_) {
+                                  onSubmitted: (_) async {
                                     if (_name.text.trim().isNotEmpty &&
                                         _email.text.trim().isNotEmpty &&
                                         _password.text.isNotEmpty &&
                                         !state.loading) {
-                                      state.register(
+                                      await state.register(
                                         name: _name.text.trim(),
                                         email: _email.text.trim(),
                                         password: _password.text,
                                       );
+                                      if (mounted && state.token != null) {
+                                        Navigator.pop(context);
+                                      }
                                     }
                                   },
                                 ),
@@ -131,11 +134,16 @@ class _AgentRegisterScreenState extends State<AgentRegisterScreen> {
                                           _email.text.trim().isEmpty ||
                                           _password.text.isEmpty
                                       ? null
-                                      : () => state.register(
+                                      : () async {
+                                          await state.register(
                                             name: _name.text.trim(),
                                             email: _email.text.trim(),
                                             password: _password.text,
-                                          ),
+                                          );
+                                          if (mounted && state.token != null) {
+                                            Navigator.pop(context);
+                                          }
+                                        },
                                 ),
                               ],
                             ),
