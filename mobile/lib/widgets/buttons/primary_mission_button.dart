@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:imposter_app/constants/palette.dart';
 import 'package:imposter_app/utils/haptics.dart';
 
-/// Primary action button with gold background and haptic feedback.
+/// Primary action button with purple background and haptic feedback.
 ///
 /// Used for main CTAs like "Start Mission", "Submit Answer", etc.
 class PrimaryMissionButton extends StatelessWidget {
@@ -19,20 +19,35 @@ class PrimaryMissionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: onTap == null ? Palette.goldDark : Palette.gold,
-          foregroundColor: Palette.text,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: onTap != null
+              ? [
+                  BoxShadow(
+                    color: Palette.primary.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
-        onPressed: onTap == null
-            ? null
-            : () {
-                Haptics.medium();
-                onTap?.call();
-              },
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: onTap == null ? Palette.primaryDark : Palette.primary,
+            foregroundColor: Palette.text,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            elevation: 0,
+          ),
+          onPressed: onTap == null
+              ? null
+              : () {
+                  Haptics.medium();
+                  onTap?.call();
+                },
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
       ),
     );
   }

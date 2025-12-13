@@ -24,9 +24,13 @@ class _MissionBriefingScreenState extends State<MissionBriefingScreen> {
       body: Stack(
         children: [
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF0A0B11), Color(0xFF0F1119)],
+                colors: [
+                  Palette.bg,
+                  Palette.panel,
+                  Palette.primary.withOpacity(0.1),
+                ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -39,7 +43,7 @@ class _MissionBriefingScreenState extends State<MissionBriefingScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('TOP SECRET', style: TextStyle(color: Palette.gold, letterSpacing: 4)),
+                    const Text('TOP SECRET', style: TextStyle(color: Palette.accent, letterSpacing: 4, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     Text(
                       'THE SPY',

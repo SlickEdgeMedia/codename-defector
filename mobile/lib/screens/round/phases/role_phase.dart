@@ -89,7 +89,7 @@ class RolePhase extends StatelessWidget {
           Text(
             isImposter ? 'SPY' : 'CIVILIAN',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: isImposter ? Palette.danger : Palette.gold,
+                  color: isImposter ? Palette.danger : Palette.accent,
                   fontWeight: FontWeight.w800,
                 ),
           ),

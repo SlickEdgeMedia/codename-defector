@@ -50,7 +50,7 @@ class _AgentRegisterScreenState extends State<AgentRegisterScreen> {
                 Align(
                   alignment: Alignment.topLeft,
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Palette.gold),
+                    icon: const Icon(Icons.arrow_back, color: Palette.accent),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -65,7 +65,7 @@ class _AgentRegisterScreenState extends State<AgentRegisterScreen> {
                           const Text(
                             'NEW RECRUIT',
                             style: TextStyle(
-                              color: Palette.gold,
+                              color: Palette.accent,
                               letterSpacing: 4,
                               fontSize: 14,
                             ),

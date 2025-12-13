@@ -48,7 +48,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                 Align(
                   alignment: Alignment.topLeft,
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Palette.gold),
+                    icon: const Icon(Icons.arrow_back, color: Palette.accent),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -63,7 +63,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                           const Text(
                             'CLASSIFIED',
                             style: TextStyle(
-                              color: Palette.gold,
+                              color: Palette.accent,
                               letterSpacing: 4,
                               fontSize: 14,
                             ),

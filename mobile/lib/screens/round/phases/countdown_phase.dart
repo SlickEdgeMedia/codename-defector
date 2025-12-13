@@ -72,15 +72,22 @@ class _CountdownPhaseState extends State<CountdownPhase> with SingleTickerProvid
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Palette.gold.withOpacity(0.3),
-                        width: 2,
+                        color: Palette.primary,
+                        width: 3,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Palette.primary.withOpacity(0.4),
+                          blurRadius: 20,
+                          spreadRadius: 4,
+                        ),
+                      ],
                     ),
                     child: Center(
                       child: Text(
                         widget.seconds.clamp(0, 99).toString(),
                         style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                              color: Palette.gold,
+                              color: Palette.primaryBright,
                               fontWeight: FontWeight.w800,
                               fontSize: 72,
                             ),

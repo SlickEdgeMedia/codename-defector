@@ -81,7 +81,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
         actions: [
           TextButton(
             onPressed: () => state.logout(),
-            child: const Text('Logout', style: TextStyle(color: Palette.gold)),
+            child: const Text('Logout', style: TextStyle(color: Palette.accent)),
           ),
         ],
       ),
@@ -122,7 +122,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
                                 _category = categories[_categoryIndex]['slug']!;
                               });
                             },
-                            icon: const Icon(Icons.chevron_left, color: Palette.gold),
+                            icon: const Icon(Icons.chevron_left, color: Palette.primary),
                           ),
                           Expanded(
                             child: Center(
@@ -139,7 +139,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
                                 _category = categories[_categoryIndex]['slug']!;
                               });
                             },
-                            icon: const Icon(Icons.chevron_right, color: Palette.gold),
+                            icon: const Icon(Icons.chevron_right, color: Palette.primary),
                           ),
                         ],
                       ),

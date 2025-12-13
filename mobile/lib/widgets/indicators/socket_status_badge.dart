@@ -25,7 +25,7 @@ class SocketStatusBadge extends StatelessWidget {
         label = 'connected';
         break;
       case SocketStatus.connecting:
-        dot = Palette.gold;
+        dot = Palette.accent;
         label = 'connecting';
         break;
       case SocketStatus.error:

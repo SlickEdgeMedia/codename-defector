@@ -37,7 +37,7 @@ class MissionLobbyScreen extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => state.logout(),
-            child: const Text('Logout', style: TextStyle(color: Palette.gold)),
+            child: const Text('Logout', style: TextStyle(color: Palette.accent)),
           ),
         ],
       ),
@@ -71,7 +71,7 @@ class MissionLobbyScreen extends StatelessWidget {
                             );
                           }
                         },
-                        icon: const Icon(Icons.copy, size: 18, color: Palette.gold),
+                        icon: const Icon(Icons.copy, size: 18, color: Palette.accent),
                       ),
                     ],
                   ),
@@ -91,8 +91,8 @@ class MissionLobbyScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           CircleAvatar(
-                            backgroundColor: Palette.gold.withAlpha(51),
-                            foregroundColor: Palette.gold,
+                            backgroundColor: Palette.primary.withAlpha(51),
+                            foregroundColor: Palette.primaryBright,
                             child: Text(
                               p.nickname.isNotEmpty ? p.nickname[0].toUpperCase() : 'A',
                               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -132,7 +132,8 @@ class MissionLobbyScreen extends StatelessWidget {
                   SwitchListTile(
                     value: state.participant?.readyAt != null,
                     onChanged: (v) => state.setReady(v),
-                    activeThumbColor: Palette.gold,
+                    activeThumbColor: Palette.accent,
+                    activeTrackColor: Palette.accent.withOpacity(0.5),
                     title: const Text('Ready up'),
                   ),
                   const SizedBox(height: 8),

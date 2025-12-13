@@ -47,7 +47,7 @@ class _GuestLoginScreenState extends State<GuestLoginScreen> {
                 Align(
                   alignment: Alignment.topLeft,
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Palette.gold),
+                    icon: const Icon(Icons.arrow_back, color: Palette.accent),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -62,7 +62,7 @@ class _GuestLoginScreenState extends State<GuestLoginScreen> {
                           const Text(
                             'GUEST ACCESS',
                             style: TextStyle(
-                              color: Palette.gold,
+                              color: Palette.accent,
                               letterSpacing: 4,
                               fontSize: 14,
                             ),

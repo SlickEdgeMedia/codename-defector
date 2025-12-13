@@ -24,7 +24,14 @@ class MissionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Palette.bg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Palette.stroke),
+        border: Border.all(color: Palette.accent, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Palette.accent.withOpacity(0.2),
+            blurRadius: 8,
+            spreadRadius: 0,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,7 +42,8 @@ class MissionCard extends StatelessWidget {
             value.toUpperCase(),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: Palette.gold,
+                  color: Palette.accent,
+                  letterSpacing: 2,
                 ),
           ),
           const SizedBox(height: 10),

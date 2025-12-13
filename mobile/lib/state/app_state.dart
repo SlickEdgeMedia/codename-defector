@@ -456,6 +456,7 @@ class AppState extends ChangeNotifier {
     showRound = false;
     roundPhase = 'role';
     resultsRoundId = null;
+    errorMessage = null; // Clear any errors when returning to lobby
     notifyListeners();
   }
 
