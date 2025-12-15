@@ -40,6 +40,10 @@ class RoundController extends Controller
             return response()->json(['message' => 'Need at least 3 players'], 422);
         }
 
+        if ($participants->count() < $room->max_players) {
+            return response()->json(['message' => 'All player slots must be filled before starting'], 422);
+        }
+
         $allReady = $participants->every(fn ($p) => $p->ready_at !== null);
         if (! $allReady) {
             return response()->json(['message' => 'All players must be ready'], 422);

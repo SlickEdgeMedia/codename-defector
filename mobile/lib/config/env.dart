@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppEnv {
@@ -16,9 +17,26 @@ class AppEnv {
     final socket = dotenv.env['SOCKET_URL']?.trim();
     final path = dotenv.env['SOCKET_PATH']?.trim();
 
+    // Platform-specific URL defaults
+    // Android emulator uses 10.0.2.2 to access host machine
+    // iOS simulator/device uses localhost
+    String defaultApiUrl;
+    String defaultSocketUrl;
+
+    if (Platform.isAndroid) {
+      defaultApiUrl = 'http://10.0.2.2:8000/api';
+      defaultSocketUrl = 'http://10.0.2.2:8000';
+    } else if (Platform.isIOS) {
+      defaultApiUrl = 'http://localhost:8000/api';
+      defaultSocketUrl = 'http://localhost:8000';
+    } else {
+      defaultApiUrl = 'http://localhost:8000/api';
+      defaultSocketUrl = 'http://localhost:6001';
+    }
+
     return AppEnv._(
-      apiBaseUrl: api?.isNotEmpty == true ? api! : 'http://localhost:8000/api',
-      socketUrl: socket?.isNotEmpty == true ? socket! : 'http://localhost:6001',
+      apiBaseUrl: api?.isNotEmpty == true ? api! : defaultApiUrl,
+      socketUrl: socket?.isNotEmpty == true ? socket! : defaultSocketUrl,
       socketPath: path?.isNotEmpty == true ? path! : '/socket.io',
     );
   }

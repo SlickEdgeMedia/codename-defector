@@ -30,7 +30,7 @@ class MissionLobbyScreen extends StatelessWidget {
     final state = context.watch<AppState>();
     final room = state.room!;
     final isHost = state.participant?.isHost ?? false;
-    final canStart = isHost && room.participants.length >= 3 && _everyoneReady(room);
+    final canStart = isHost && room.participants.length == room.maxPlayers && _everyoneReady(room);
 
     return Scaffold(
       appBar: AppBar(
