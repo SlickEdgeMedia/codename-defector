@@ -577,10 +577,18 @@ class AppState extends ChangeNotifier {
     if (type.startsWith('room.')) {
       // Handle room.expired event
       if (type == 'room.expired') {
-        // Room expired due to inactivity - disconnect and clear session
-        disconnectSocket();
-        clearSession();
-        // The UI will show this through the normal session/room state
+        // Room expired due to inactivity - clear session state
+        room = null;
+        participant = null;
+        _resetRoundState();
+        socketService.disconnect();
+        socketRoomCode = null;
+        _stopPolling();
+        showRound = true;
+        roundPhase = 'role';
+        _stopCountdown();
+        notifyListeners();
+        return; // Don't call refreshRoom() since we cleared the room
       }
       refreshRoom();
     }
