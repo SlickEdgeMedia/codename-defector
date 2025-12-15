@@ -19,7 +19,8 @@ class AppEnv {
 
     // Platform-specific URL defaults
     // Android emulator uses 10.0.2.2 to access host machine
-    // iOS simulator/device uses localhost
+    // iOS simulator/device needs actual network IP (localhost doesn't work)
+    // Use your machine's IP address for iOS (check with ifconfig)
     String defaultApiUrl;
     String defaultSocketUrl;
 
@@ -27,8 +28,9 @@ class AppEnv {
       defaultApiUrl = 'http://10.0.2.2:8000/api';
       defaultSocketUrl = 'http://10.0.2.2:8000';
     } else if (Platform.isIOS) {
-      defaultApiUrl = 'http://localhost:8000/api';
-      defaultSocketUrl = 'http://localhost:8000';
+      // iOS requires actual network IP, not localhost
+      defaultApiUrl = 'http://192.168.1.170:8000/api';
+      defaultSocketUrl = 'http://192.168.1.170:8000';
     } else {
       defaultApiUrl = 'http://localhost:8000/api';
       defaultSocketUrl = 'http://localhost:6001';
