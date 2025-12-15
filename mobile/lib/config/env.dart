@@ -26,12 +26,12 @@ class AppEnv {
 
     if (Platform.isAndroid) {
       defaultApiUrl = 'http://10.0.2.2:8000/api';
-      defaultSocketUrl = 'http://10.0.2.2:8000';
+      defaultSocketUrl = 'http://10.0.2.2:6001';
     } else if (Platform.isIOS) {
       // iOS simulator can use localhost (runs on same Mac)
       // Physical iOS devices need actual network IP (192.168.1.170)
       defaultApiUrl = 'http://localhost:8000/api';
-      defaultSocketUrl = 'http://localhost:8000';
+      defaultSocketUrl = 'http://localhost:6001';
     } else {
       defaultApiUrl = 'http://localhost:8000/api';
       defaultSocketUrl = 'http://localhost:6001';
