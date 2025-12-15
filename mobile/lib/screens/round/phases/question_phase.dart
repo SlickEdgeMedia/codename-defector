@@ -130,21 +130,79 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isMyTurn
-                            ? 'Interrogate an agent'
-                            : asker != null
-                                ? '${asker.nickname} is interrogating'
-                                : 'Waiting for game to start',
+                        widget.state.turnTimedOut && isMyTurn
+                            ? widget.state.isAskingPhase
+                                ? 'Failed to ask question in time'
+                                : 'Waiting for answer...'
+                            : widget.state.turnTimedOut && !isMyTurn && widget.state.isAskingPhase
+                                ? '${asker?.nickname ?? 'Agent'} timed out'
+                                : widget.state.turnTimedOut && !isMyTurn && !widget.state.isAskingPhase
+                                    ? 'Answering agent timed out'
+                                    : isMyTurn
+                                        ? 'Interrogate an agent'
+                                        : asker != null
+                                            ? '${asker.nickname} is interrogating'
+                                            : 'Waiting for game to start',
                         style: TextStyle(
-                          color: isMyTurn ? Palette.text : Palette.muted,
-                          fontWeight: isMyTurn ? FontWeight.w700 : FontWeight.normal,
+                          color: widget.state.turnTimedOut
+                              ? Palette.danger
+                              : isMyTurn
+                                  ? Palette.text
+                                  : Palette.muted,
+                          fontWeight: isMyTurn || widget.state.turnTimedOut ? FontWeight.w700 : FontWeight.normal,
                           fontSize: 16,
                         ),
                       ),
+                      // Show asking/answering phase indicator
+                      if (widget.state.turnSeconds != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.state.isAskingPhase ? 'Asking phase' : 'Answering phase',
+                          style: TextStyle(
+                            color: widget.state.turnSeconds! <= 10 ? Palette.danger : Palette.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                if (isMyTurn)
+                // Turn timer display
+                if (widget.state.turnSeconds != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: widget.state.turnSeconds! <= 10
+                          ? Palette.danger.withOpacity(0.2)
+                          : Palette.primary.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: widget.state.turnSeconds! <= 10 ? Palette.danger : Palette.primary,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer,
+                          color: widget.state.turnSeconds! <= 10 ? Palette.danger : Palette.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${widget.state.turnSeconds}s',
+                          style: TextStyle(
+                            color: widget.state.turnSeconds! <= 10 ? Palette.danger : Palette.primary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (isMyTurn)
                   FadeTransition(
                     opacity: _pulseAnimation,
                     child: Icon(
@@ -271,8 +329,15 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
                   ),
                   const SizedBox(height: 16),
                   PrimaryMissionButton(
-                    label: widget.state.askedQuestion ? 'Question sent' : 'Submit question',
-                    onTap: widget.state.askedQuestion || widget.questionTarget == null || !isMyTurn
+                    label: widget.state.turnTimedOut && widget.state.isAskingPhase
+                        ? 'Time expired'
+                        : widget.state.askedQuestion
+                            ? 'Question sent'
+                            : 'Submit question',
+                    onTap: widget.state.askedQuestion ||
+                            widget.questionTarget == null ||
+                            !isMyTurn ||
+                            widget.state.turnTimedOut
                         ? null
                         : () => widget.state.askQuestion(
                               targetId: widget.questionTarget!,
@@ -388,11 +453,15 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
                       ),
                       const SizedBox(height: 12),
                       PrimaryMissionButton(
-                        label: 'Submit answer',
-                        onTap: () => widget.state.answerQuestion(
-                          questionId: q.id,
-                          text: ctrl.text.trim(),
-                        ),
+                        label: widget.state.turnTimedOut && !widget.state.isAskingPhase && q.id == widget.state.currentQuestionId
+                            ? 'Time expired'
+                            : 'Submit answer',
+                        onTap: widget.state.turnTimedOut && !widget.state.isAskingPhase && q.id == widget.state.currentQuestionId
+                            ? null
+                            : () => widget.state.answerQuestion(
+                                  questionId: q.id,
+                                  text: ctrl.text.trim(),
+                                ),
                       ),
                     ],
                   ),

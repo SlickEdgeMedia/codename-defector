@@ -160,8 +160,14 @@ class RoundController extends Controller
 
         $data = $request->validate([
             'target_participant_id' => 'required|integer|exists:room_participants,id',
-            'text' => 'required|string|min:3|max:500',
+            'text' => 'required|string|min:1|max:500',
         ]);
+
+        // Custom validation: reject questions shorter than 3 chars unless it's a timeout marker
+        $questionText = trim($data['text']);
+        if (strlen($questionText) < 3 && $questionText !== '[Timed out]') {
+            return response()->json(['message' => 'Question must be at least 3 characters'], 422);
+        }
 
         $current = RoundQuestion::where('round_id', $round->id)
             ->where('status', 'in_progress')
@@ -183,18 +189,66 @@ class RoundController extends Controller
         $current->target_participant_id = $targetId;
         $current->text = $data['text'];
         $current->asked_at = now();
-        $current->status = 'in_progress';
-        $current->save();
 
-        $this->publisher->broadcast('round.question', $round->room, [
-            'round_id' => $round->id,
-            'question_id' => $current->id,
-            'asker_id' => $participant->id,
-            'asker_nickname' => $participant->nickname,
-            'target_id' => $targetId,
-            'target_nickname' => $target?->nickname,
-            'text' => $data['text'],
-        ]);
+        // Check if this is a timed-out question
+        $isTimedOut = trim($data['text']) === '[Timed out]';
+
+        if ($isTimedOut) {
+            // Mark as answered immediately (skipped due to timeout)
+            $current->status = 'answered';
+            $current->save();
+
+            // Broadcast the timed-out question
+            $this->publisher->broadcast('round.question', $round->room, [
+                'round_id' => $round->id,
+                'question_id' => $current->id,
+                'asker_id' => $participant->id,
+                'asker_nickname' => $participant->nickname,
+                'target_id' => $targetId,
+                'target_nickname' => $target?->nickname,
+                'text' => $data['text'],
+            ]);
+
+            // Immediately move to next question
+            $next = RoundQuestion::where('round_id', $round->id)
+                ->where('status', 'pending')
+                ->orderBy('order')
+                ->first();
+
+            if ($next) {
+                $next->update(['status' => 'in_progress']);
+                $this->publisher->broadcast('round.question_turn', $round->room, [
+                    'round_id' => $round->id,
+                    'question_id' => $next->id,
+                    'asker_id' => $next->asker_participant_id,
+                    'target_id' => $next->target_participant_id,
+                    'order' => $next->order,
+                ]);
+            } else {
+                // All questions done - transition to voting
+                $round->status = Round::STATUS_VOTING;
+                $round->save();
+
+                $this->publisher->broadcast('round.phase', $round->room, [
+                    'round_id' => $round->id,
+                    'phase' => 'voting',
+                ]);
+            }
+        } else {
+            // Normal question - wait for answer
+            $current->status = 'in_progress';
+            $current->save();
+
+            $this->publisher->broadcast('round.question', $round->room, [
+                'round_id' => $round->id,
+                'question_id' => $current->id,
+                'asker_id' => $participant->id,
+                'asker_nickname' => $participant->nickname,
+                'target_id' => $targetId,
+                'target_nickname' => $target?->nickname,
+                'text' => $data['text'],
+            ]);
+        }
 
         // Ensure room snapshot reflects the updated target/text promptly
         $round->touch();
@@ -222,6 +276,13 @@ class RoundController extends Controller
             'question_id' => 'required|integer|exists:round_questions,id',
             'text' => 'required|string|min:1|max:500',
         ]);
+
+        // Custom validation: reject answers shorter than 2 chars unless it's a timeout marker
+        // (allows "No", "Yes", etc.)
+        $answerText = trim($data['text']);
+        if (strlen($answerText) < 2 && $answerText !== '[Timed out]') {
+            return response()->json(['message' => 'Answer must be at least 2 characters'], 422);
+        }
 
         $question = RoundQuestion::where('round_id', $round->id)
             ->where('id', $data['question_id'])
@@ -609,7 +670,8 @@ class RoundController extends Controller
             $guess = ImposterGuess::where('round_id', $round->id)->first();
             if ($guess && $guess->word_id !== null) {
                 // Only score if they actually guessed (not skipped)
-                $participantPoints[$imposterId] = ($participantPoints[$imposterId] ?? 0) + ($guess->correct ? 3 : -2);
+                // Correct guess: +2, Wrong guess: 0 (no penalty)
+                $participantPoints[$imposterId] = ($participantPoints[$imposterId] ?? 0) + ($guess->correct ? 2 : 0);
             }
 
             // Create one score entry per participant with total points

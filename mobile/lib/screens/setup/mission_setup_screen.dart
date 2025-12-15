@@ -24,6 +24,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
   String _category = 'countries';
   double _durationMinutes = 10;
   int _categoryIndex = 0;
+  int _playerCount = 3; // Min 3 for testing, default 3
   bool _hasInitialized = false;
 
   @override
@@ -144,6 +145,48 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+                      const Text('Player count', style: TextStyle(color: Palette.muted)),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            onPressed: _playerCount > 3
+                                ? () {
+                                    setState(() {
+                                      _playerCount -= 1;
+                                    });
+                                  }
+                                : null,
+                            icon: Icon(
+                              Icons.chevron_left,
+                              color: _playerCount > 3 ? Palette.primary : Palette.muted,
+                            ),
+                          ),
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                '$_playerCount players',
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _playerCount < 10
+                                ? () {
+                                    setState(() {
+                                      _playerCount += 1;
+                                    });
+                                  }
+                                : null,
+                            icon: Icon(
+                              Icons.chevron_right,
+                              color: _playerCount < 10 ? Palette.primary : Palette.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -167,6 +210,7 @@ class _MissionSetupScreenState extends State<MissionSetupScreen> {
                                   nickname: _hostCodename.text.trim(),
                                   category: _category,
                                   roundDurationSeconds: (_durationMinutes * 60).toInt(),
+                                  maxPlayers: _playerCount,
                                 ),
                       ),
                     ],

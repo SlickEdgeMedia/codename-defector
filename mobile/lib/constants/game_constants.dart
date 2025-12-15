@@ -95,4 +95,10 @@ class TimingDefaults {
 
   /// Maximum players per room
   static const int maxPlayers = 12;
+
+  /// Time allowed for each player to ask a question
+  static const int askQuestionSeconds = 30;
+
+  /// Time allowed for each player to answer a question
+  static const int answerQuestionSeconds = 20;
 }

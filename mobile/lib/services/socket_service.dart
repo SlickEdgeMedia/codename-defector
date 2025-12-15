@@ -31,7 +31,6 @@ class SocketService {
     );
 
     _socket?.on('connect', (_) {
-      debugPrint('Socket connected');
       onStatus?.call('connected');
     });
 
@@ -44,18 +43,15 @@ class SocketService {
     });
 
     _socket?.on('disconnect', (_) {
-      debugPrint('Socket disconnected');
       onStatus?.call('disconnected');
     });
 
     _socket?.on('connect_error', (error) {
-      debugPrint('Socket connect_error: $error');
       onStatus?.call('error');
       onError?.call(error.toString());
     });
 
     _socket?.on('error', (error) {
-      debugPrint('Socket error: $error');
       onStatus?.call('error');
       onError?.call(error.toString());
     });
@@ -81,7 +77,6 @@ class SocketService {
 
     for (final eventName in events) {
       _socket?.on(eventName, (data) {
-        debugPrint('SOCKET EVENT: $eventName');
         if (data is Map<String, dynamic>) {
           onEvent(data);
         } else if (data is Map) {

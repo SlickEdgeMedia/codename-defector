@@ -5,6 +5,7 @@ import 'package:imposter_app/screens/round/phases/countdown_phase.dart';
 import 'package:imposter_app/screens/round/phases/question_phase.dart';
 import 'package:imposter_app/screens/round/phases/results_phase.dart';
 import 'package:imposter_app/screens/round/phases/role_phase.dart';
+import 'package:imposter_app/screens/round/phases/time_up_phase.dart';
 import 'package:imposter_app/screens/round/phases/voting_phase.dart';
 import 'package:imposter_app/state/app_state.dart';
 import 'package:imposter_app/widgets/headers/phase_header.dart';
@@ -62,6 +63,14 @@ class _RoundPhaseScreenState extends State<RoundPhaseScreen> {
       _lastQuestionId = state.currentQuestionId;
       _questionText.clear();
       _questionTarget = null;
+    }
+
+    // Check if time expired - show Time's Up phase
+    if (state.timeExpired) {
+      return Scaffold(
+        backgroundColor: Palette.bg,
+        body: TimeUpPhase(state: state),
+      );
     }
 
     final phase = state.roundPhase;

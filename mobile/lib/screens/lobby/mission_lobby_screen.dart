@@ -83,7 +83,10 @@ class MissionLobbyScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  const Text('Agents', style: TextStyle(color: Palette.muted)),
+                  Text(
+                    'Agents (${room.participants.length}/${room.maxPlayers})',
+                    style: const TextStyle(color: Palette.muted),
+                  ),
                   const SizedBox(height: 8),
                   ...room.participants.map((p) {
                     final ready = p.readyAt != null;

@@ -35,6 +35,13 @@ class AppState extends ChangeNotifier {
   final SocketService socketService;
   final SharedPreferences prefs;
 
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    // After every state change, ensure timer is running if needed
+    _ensureTurnTimerRunning();
+  }
+
   // ============================================================================
   // Authentication State
   // ============================================================================
@@ -85,6 +92,12 @@ class AppState extends ChangeNotifier {
   int? currentAskerId;
   bool askedQuestion = false;
 
+  // Per-turn timers
+  int? turnSeconds; // Seconds remaining for current turn
+  bool isAskingPhase = true; // true = asking, false = answering
+  Timer? _turnTimer;
+  bool turnTimedOut = false; // Track if current turn timed out
+
   // Voting State
   Map<int, int> voteTotals = {};
   bool voted = false;
@@ -106,6 +119,8 @@ class AppState extends ChangeNotifier {
   Timer? _missionTimer;
   int? missionSeconds;
   DateTime? missionStart;
+  bool timeExpired = false;
+  bool _timeExpiredHandled = false;
 
   // ============================================================================
   // Authentication Methods
@@ -204,6 +219,7 @@ class AppState extends ChangeNotifier {
     required String nickname,
     required String category,
     required int roundDurationSeconds,
+    int? maxPlayers,
   }) async {
     if (token == null) return;
     await _runGuarded(() async {
@@ -211,6 +227,7 @@ class AppState extends ChangeNotifier {
         nickname: nickname,
         category: category,
         roundDurationSeconds: roundDurationSeconds,
+        maxPlayers: maxPlayers,
       );
       _setRoomSession(session);
     }, fallbackMessage: 'Failed to create room');
@@ -313,6 +330,10 @@ class AppState extends ChangeNotifier {
       _startCountdown(countdownTotal, onFinished: () {
         roundPhase = _pendingPhaseAfterCountdown ?? 'role';
         _pendingPhaseAfterCountdown = null;
+        // Start turn timer when countdown finishes and we have a first asker
+        if (currentAskerId != null && roundPhase == 'question') {
+          _startTurnTimer(isAsking: true);
+        }
         notifyListeners();
       });
       loadRoundRole(roundId);
@@ -386,29 +407,21 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> guessWord({required int wordId}) async {
-    print('🟠 guessWord called, wordId: $wordId, activeRoundId: $activeRoundId');
     if (activeRoundId == null) {
-      print('🔴 guessWord: No active round ID');
       return;
     }
     await _runGuarded(() async {
-      print('🟡 guessWord: Calling backend API...');
       await roundRepository.imposterGuess(roundId: activeRoundId!, wordId: wordId);
-      print('🟢 guessWord: Backend call succeeded');
       guessSubmitted = true;
     }, fallbackMessage: 'Guess failed', setLoading: false);
   }
 
   Future<void> skipVote() async {
-    print('🟠 skipVote called, activeRoundId: $activeRoundId');
     if (activeRoundId == null) {
-      print('🔴 skipVote: No active round ID');
       return;
     }
     await _runGuarded(() async {
-      print('🟡 skipVote: Calling backend API...');
       await roundRepository.skipGuess(roundId: activeRoundId!);
-      print('🟢 skipVote: Backend call succeeded');
       voted = true;
       guessSubmitted = true;
     }, fallbackMessage: 'Skip failed', setLoading: false);
@@ -437,18 +450,14 @@ class AppState extends ChangeNotifier {
     // Use provided roundId, or fallback to resultsRoundId (for refresh), or activeRoundId
     final id = roundId ?? resultsRoundId ?? activeRoundId;
     if (id == null) {
-      print('🔴 fetchResults: No round ID available (roundId=$roundId, resultsRoundId=$resultsRoundId, activeRoundId=$activeRoundId)');
       return;
     }
     try {
-      print('🟡 fetchResults: Fetching results for round $id');
       roundResults = await roundRepository.fetchResults(id);
       resultsRoundId = id; // Remember which round results we're showing
-      print('🟢 fetchResults: Success! Scores: ${roundResults?.scores.length ?? 0}, Cumulative: ${roundResults?.cumulativeScores.length ?? 0}');
       notifyListeners();
     } catch (e, stackTrace) {
-      print('🔴 fetchResults: Error - $e');
-      print('🔴 Stack trace: $stackTrace');
+      // Error fetching results
     }
   }
 
@@ -480,6 +489,33 @@ class AppState extends ChangeNotifier {
       updated.add(word);
     }
     crossedWords = updated;
+    notifyListeners();
+  }
+
+  /// Get list of participants who didn't ask or answer questions when time expired
+  List<String> getInactivePlayers() {
+    if (room == null) return [];
+
+    final allParticipants = room!.participants.map((p) => p.id).toSet();
+    final activeParticipants = <int>{};
+
+    // Add all askers and targets
+    for (final q in roundQuestions) {
+      activeParticipants.add(q.askerId);
+      activeParticipants.add(q.targetId);
+    }
+
+    final inactiveIds = allParticipants.difference(activeParticipants);
+    return room!.participants
+        .where((p) => inactiveIds.contains(p.id))
+        .map((p) => p.nickname)
+        .toList();
+  }
+
+  /// Proceed to voting phase after time expired
+  void proceedToVoting() {
+    timeExpired = false;
+    roundPhase = GamePhases.voting;
     notifyListeners();
   }
 
@@ -565,6 +601,10 @@ class AppState extends ChangeNotifier {
           _startCountdown(remainingCountdown, onFinished: () {
             roundPhase = _pendingPhaseAfterCountdown ?? 'role';
             _pendingPhaseAfterCountdown = null;
+            // Start turn timer when countdown finishes and we have a first asker
+            if (currentAskerId != null && roundPhase == 'question') {
+              _startTurnTimer(isAsking: true);
+            }
             notifyListeners();
           });
           if (id != null) {
@@ -573,6 +613,7 @@ class AppState extends ChangeNotifier {
           break;
         case 'round.question_turn':
           askedQuestion = false;
+          turnTimedOut = false; // Reset timeout for new turn
           currentAskerId = (payload?['asker_id'] as num?)?.toInt();
           currentQuestionId = (payload?['question_id'] as num?)?.toInt();
           if (roundPhase == 'countdown') {
@@ -580,23 +621,50 @@ class AppState extends ChangeNotifier {
           } else {
             roundPhase = 'question';
           }
+          // Start asking timer for this turn
+          _startTurnTimer(isAsking: true);
           notifyListeners();
           break;
         case 'round.question':
           final text = payload?['text'] as String? ?? '';
-          if (text.trim().isEmpty) break;
           final qId = (payload?['question_id'] as num?)?.toInt() ?? 0;
+          final newAskerId = (payload?['asker_id'] as num?)?.toInt();
+
+          // Detect if this is a new turn (new asker)
+          final isNewAsker = newAskerId != null && newAskerId != currentAskerId;
+
           currentQuestionId = qId;
-          currentAskerId = (payload?['asker_id'] as num?)?.toInt();
+          currentAskerId = newAskerId;
           roundPhase = countdownSeconds > 0 ? 'countdown' : 'question';
-          _upsertQuestion(RoundQuestionItem(
-            id: qId,
-            askerId: (payload?['asker_id'] as num?)?.toInt() ?? 0,
-            targetId: (payload?['target_id'] as num?)?.toInt() ?? 0,
-            text: text,
-            askerName: payload?['asker_nickname'] as String?,
-            targetName: payload?['target_nickname'] as String?,
-          ));
+
+          // Check if this is a timed-out question
+          final isTimedOutQuestion = text.trim() == '[Timed out]';
+
+          // Only add to question list if there's actual text and it's not a timeout
+          if (text.trim().isNotEmpty && !isTimedOutQuestion) {
+            _upsertQuestion(RoundQuestionItem(
+              id: qId,
+              askerId: (payload?['asker_id'] as num?)?.toInt() ?? 0,
+              targetId: (payload?['target_id'] as num?)?.toInt() ?? 0,
+              text: text,
+              askerName: payload?['asker_nickname'] as String?,
+              targetName: payload?['target_nickname'] as String?,
+            ));
+          }
+
+          // Handle timer based on whether it's a new turn or question submitted
+          if (isNewAsker) {
+            // New asker = new turn starting, they need to ask
+            askedQuestion = false; // Reset for new asker
+            turnTimedOut = false;
+            _startTurnTimer(isAsking: true);
+          } else if (isTimedOutQuestion) {
+            // Timed out question - DON'T start answering timer, backend will send next turn
+            _stopTurnTimer(); // Make sure no timer is running
+          } else if (text.trim().isNotEmpty) {
+            // Same asker but question has text = question was submitted, start answering
+            _startTurnTimer(isAsking: false);
+          }
           break;
         case 'round.answer':
           if (payload != null) {
@@ -604,13 +672,12 @@ class AppState extends ChangeNotifier {
               (payload['question_id'] as num?)?.toInt() ?? 0,
               payload['text'] as String? ?? '',
             );
+            // Answer was submitted, stop the timer
+            _stopTurnTimer();
           }
           break;
         case 'round.all_questions_answered':
           allQuestionsAnswered = true;
-          print('🔥 DEBUG: ALL QUESTIONS ANSWERED EVENT RECEIVED');
-          print('🔥 DEBUG: allQuestionsAnswered = $allQuestionsAnswered');
-          print('🔥 DEBUG: roundPhase = $roundPhase');
           break;
         case 'round.ready_for_voting':
           if (payload != null) {
@@ -619,6 +686,7 @@ class AppState extends ChangeNotifier {
           break;
         case 'round.votes_updated':
           roundPhase = 'voting';
+          _stopTurnTimer(); // Stop any active turn timer
           if (payload != null) {
             _ingestVotes(payload);
           }
@@ -637,11 +705,8 @@ class AppState extends ChangeNotifier {
           guessSubmitted = true;
           break;
         case 'round.results':
-          print('🔵 SOCKET: round.results received');
-          print('🔵 Payload: $payload');
           roundPhase = 'results';
           final roundId = (payload?['round_id'] as num?)?.toInt();
-          print('🔵 Extracted round_id: $roundId');
           fetchResults(roundId);
           break;
       }
@@ -731,7 +796,10 @@ class AppState extends ChangeNotifier {
     countdownSeconds = room?.countdownSeconds ?? 5;
     missionSeconds = null;
     missionStart = null;
+    timeExpired = false;
+    _timeExpiredHandled = false;
     _stopMissionTimer();
+    _stopTurnTimer();
   }
 
   void _hydrateRoundTiming(Room roomData) {
@@ -903,8 +971,20 @@ class AppState extends ChangeNotifier {
     _stopMissionTimer();
     missionStart = startedAt;
     final total = duration;
+    timeExpired = false;
+    _timeExpiredHandled = false;
     _missionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      missionSeconds = _computeRemaining(total, startedAt);
+      final newSeconds = _computeRemaining(total, startedAt);
+      final oldSeconds = missionSeconds;
+      missionSeconds = newSeconds;
+
+      // Detect when timer hits 0 for the first time
+      if (newSeconds == 0 && oldSeconds != null && oldSeconds > 0 && !_timeExpiredHandled) {
+        timeExpired = true;
+        _timeExpiredHandled = true;
+        print('⏰ TIMER EXPIRED: Transitioning to time-up phase');
+      }
+
       notifyListeners();
     });
   }
@@ -912,6 +992,141 @@ class AppState extends ChangeNotifier {
   void _stopMissionTimer() {
     _missionTimer?.cancel();
     _missionTimer = null;
+  }
+
+  /// Start a turn timer for asking or answering
+  void _startTurnTimer({required bool isAsking}) {
+    // CRITICAL: Stop any existing timer first
+    _stopTurnTimer();
+
+    isAskingPhase = isAsking;
+    turnTimedOut = false; // Reset timeout flag
+    final duration = isAsking
+        ? TimingDefaults.askQuestionSeconds
+        : TimingDefaults.answerQuestionSeconds;
+    turnSeconds = duration;
+
+    _turnTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Check if timer was cancelled externally
+      if (_turnTimer == null) {
+        timer.cancel();
+        return;
+      }
+
+      if (turnSeconds == null || turnSeconds! <= 1) {
+        // About to hit 0, handle timeout
+        timer.cancel();
+        _handleTurnTimeout();
+        return;
+      }
+
+      turnSeconds = turnSeconds! - 1;
+      notifyListeners();
+    });
+  }
+
+  void _stopTurnTimer() {
+    if (_turnTimer != null) {
+      _turnTimer!.cancel();
+      _turnTimer = null;
+    }
+    turnSeconds = null;
+    turnTimedOut = false;
+  }
+
+  /// Check if we should start a timer for the current player's turn
+  void _ensureTurnTimerRunning() {
+    // Only check when in question phase
+    if (roundPhase != 'question') return;
+
+    // If timer is already running or timed out, don't interfere
+    if (turnSeconds != null || turnTimedOut) return;
+
+    // If no current asker, nothing to do
+    if (currentAskerId == null || participant == null) return;
+
+    // Check if it's this participant's turn to ask
+    if (currentAskerId == participant!.id && !askedQuestion) {
+      _startTurnTimer(isAsking: true);
+      return;
+    }
+
+    // Check if there's a pending question for this participant to answer
+    final pendingQ = pendingQuestions.firstWhere(
+      (q) => q.id == currentQuestionId && q.targetId == participant!.id,
+      orElse: () => RoundQuestionItem(id: 0, askerId: 0, targetId: 0, text: ''),
+    );
+
+    if (pendingQ.id > 0 && currentAskerId != participant!.id) {
+      _startTurnTimer(isAsking: false);
+    }
+  }
+
+  /// Handle when a turn timer expires
+  void _handleTurnTimeout() {
+
+    // Stop the timer immediately
+    if (_turnTimer != null) {
+      _turnTimer!.cancel();
+      _turnTimer = null;
+    }
+
+    turnTimedOut = true;
+    turnSeconds = 0; // Set to 0 to show "0s"
+
+    // Mark question as "asked" to prevent submission
+    if (isAskingPhase) {
+      askedQuestion = true;
+    }
+
+    notifyListeners();
+
+    // Auto-submit empty response to progress the game
+    _autoSkipTurn();
+  }
+
+  /// Automatically skip turn by submitting timeout marker to backend
+  Future<void> _autoSkipTurn() async {
+    if (activeRoundId == null || participant == null) return;
+
+    try {
+      if (isAskingPhase && currentAskerId == participant!.id) {
+        // This player was supposed to ask but timed out
+        // Submit to random valid target so backend knows to move on
+        final validTargets = room?.participants.where((p) => p.id != participant!.id).toList() ?? [];
+        if (validTargets.isEmpty) {
+          return;
+        }
+
+        // Pick a RANDOM target to avoid patterns
+        final randomIndex = DateTime.now().millisecondsSinceEpoch % validTargets.length;
+        final randomTarget = validTargets[randomIndex];
+
+        await roundRepository.askQuestion(
+          roundId: activeRoundId!,
+          targetId: randomTarget.id,
+          text: '[Timed out]',
+          askerId: participant!.id,
+        );
+      } else if (!isAskingPhase && currentQuestionId != null) {
+        // Someone needs to answer but timed out
+        // Submit empty answer so backend knows to move on
+        final pendingQ = pendingQuestions.firstWhere(
+          (q) => q.id == currentQuestionId,
+          orElse: () => RoundQuestionItem(id: 0, askerId: 0, targetId: 0, text: ''),
+        );
+
+        if (pendingQ.id > 0 && pendingQ.targetId == participant!.id) {
+          await roundRepository.answerQuestion(
+            roundId: activeRoundId!,
+            questionId: currentQuestionId!,
+            text: '[Timed out]',
+          );
+        }
+      }
+    } catch (e) {
+      // Don't show error to user, backend will progress anyway
+    }
   }
 
   int _computeRemaining(int totalSeconds, DateTime startedAt) {
