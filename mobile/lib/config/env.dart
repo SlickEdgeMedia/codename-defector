@@ -28,9 +28,10 @@ class AppEnv {
       defaultApiUrl = 'http://10.0.2.2:8000/api';
       defaultSocketUrl = 'http://10.0.2.2:8000';
     } else if (Platform.isIOS) {
-      // iOS requires actual network IP, not localhost
-      defaultApiUrl = 'http://192.168.1.170:8000/api';
-      defaultSocketUrl = 'http://192.168.1.170:8000';
+      // iOS simulator can use localhost (runs on same Mac)
+      // Physical iOS devices need actual network IP (192.168.1.170)
+      defaultApiUrl = 'http://localhost:8000/api';
+      defaultSocketUrl = 'http://localhost:8000';
     } else {
       defaultApiUrl = 'http://localhost:8000/api';
       defaultSocketUrl = 'http://localhost:6001';
