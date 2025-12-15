@@ -58,6 +58,8 @@ class RoomController extends Controller
             return [$room->fresh(['participants.user']), $participant->fresh('user')];
         });
 
+        $room->touch('last_active_at');
+
         $this->publisher->broadcast('room.created', $room, [
             'user_id' => $participant->user_id,
             'guest_token' => $participant->guest_token,
@@ -139,6 +141,8 @@ class RoomController extends Controller
         $room->load(['participants.user']);
         $participant->load('user');
 
+        $room->touch('last_active_at');
+
         $this->publisher->broadcast('room.joined', $room, [
             'user_id' => $participant->user_id,
             'guest_token' => $participant->guest_token,
@@ -158,6 +162,8 @@ class RoomController extends Controller
         if (! $room) {
             return response()->json(['message' => 'Room not found.'], 404);
         }
+
+        $room->touch('last_active_at');
 
         $participant = RoomParticipant::where('room_id', $room->id)
             ->when($actor['type'] === 'user', fn ($q) => $q->where('user_id', $actor['id']))
@@ -222,6 +228,8 @@ class RoomController extends Controller
 
         $participant->load('user');
         $room->load(['participants.user']);
+
+        $room->touch('last_active_at');
 
         $this->publisher->broadcast('room.ready_updated', $room, [
             'user_id' => $participant->user_id,

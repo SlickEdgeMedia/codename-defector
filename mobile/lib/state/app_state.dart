@@ -38,8 +38,10 @@ class AppState extends ChangeNotifier {
   @override
   void notifyListeners() {
     super.notifyListeners();
-    // After every state change, ensure timer is running if needed
-    _ensureTurnTimerRunning();
+    // Only ensure timer if not already in the process (prevent re-entry)
+    if (!_isEnsuring) {
+      _ensureTurnTimerRunning();
+    }
   }
 
   // ============================================================================
@@ -97,6 +99,7 @@ class AppState extends ChangeNotifier {
   bool isAskingPhase = true; // true = asking, false = answering
   Timer? _turnTimer;
   bool turnTimedOut = false; // Track if current turn timed out
+  bool _isEnsuring = false; // Re-entry guard for _ensureTurnTimerRunning
 
   // Voting State
   Map<int, int> voteTotals = {};
@@ -572,6 +575,13 @@ class AppState extends ChangeNotifier {
     if (type == null) return;
 
     if (type.startsWith('room.')) {
+      // Handle room.expired event
+      if (type == 'room.expired') {
+        // Room expired due to inactivity - disconnect and clear session
+        disconnectSocket();
+        clearSession();
+        // The UI will show this through the normal session/room state
+      }
       refreshRoom();
     }
 
@@ -1036,29 +1046,37 @@ class AppState extends ChangeNotifier {
 
   /// Check if we should start a timer for the current player's turn
   void _ensureTurnTimerRunning() {
-    // Only check when in question phase
-    if (roundPhase != 'question') return;
+    // Prevent re-entry
+    if (_isEnsuring) return;
+    _isEnsuring = true;
 
-    // If timer is already running or timed out, don't interfere
-    if (turnSeconds != null || turnTimedOut) return;
+    try {
+      // Only check when in question phase
+      if (roundPhase != 'question') return;
 
-    // If no current asker, nothing to do
-    if (currentAskerId == null || participant == null) return;
+      // If timer is already running or timed out, don't interfere
+      if (turnSeconds != null || turnTimedOut) return;
 
-    // Check if it's this participant's turn to ask
-    if (currentAskerId == participant!.id && !askedQuestion) {
-      _startTurnTimer(isAsking: true);
-      return;
-    }
+      // If no current asker, nothing to do
+      if (currentAskerId == null || participant == null) return;
 
-    // Check if there's a pending question for this participant to answer
-    final pendingQ = pendingQuestions.firstWhere(
-      (q) => q.id == currentQuestionId && q.targetId == participant!.id,
-      orElse: () => RoundQuestionItem(id: 0, askerId: 0, targetId: 0, text: ''),
-    );
+      // Check if it's this participant's turn to ask
+      if (currentAskerId == participant!.id && !askedQuestion) {
+        _startTurnTimer(isAsking: true);
+        return;
+      }
 
-    if (pendingQ.id > 0 && currentAskerId != participant!.id) {
-      _startTurnTimer(isAsking: false);
+      // Check if there's a pending question for this participant to answer
+      final pendingQ = pendingQuestions.firstWhere(
+        (q) => q.id == currentQuestionId && q.targetId == participant!.id,
+        orElse: () => RoundQuestionItem(id: 0, askerId: 0, targetId: 0, text: ''),
+      );
+
+      if (pendingQ.id > 0 && currentAskerId != participant!.id) {
+        _startTurnTimer(isAsking: false);
+      }
+    } finally {
+      _isEnsuring = false;
     }
   }
 
