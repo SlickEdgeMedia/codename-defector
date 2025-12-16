@@ -1000,7 +1000,7 @@ class AppState extends ChangeNotifier {
       if (newSeconds == 0 && oldSeconds != null && oldSeconds > 0 && !_timeExpiredHandled) {
         timeExpired = true;
         _timeExpiredHandled = true;
-        print('⏰ TIMER EXPIRED: Transitioning to time-up phase');
+        // Timer expired - transition to time-up phase
       }
 
       notifyListeners();
