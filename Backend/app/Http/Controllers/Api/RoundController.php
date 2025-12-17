@@ -40,6 +40,10 @@ class RoundController extends Controller
             return response()->json(['message' => 'Need at least 3 players'], 422);
         }
 
+        if ($participants->count() < $room->max_players) {
+            return response()->json(['message' => 'All player slots must be filled before starting'], 422);
+        }
+
         $allReady = $participants->every(fn ($p) => $p->ready_at !== null);
         if (! $allReady) {
             return response()->json(['message' => 'All players must be ready'], 422);
@@ -153,6 +157,8 @@ class RoundController extends Controller
         $round = Round::with(['room', 'questions'])->findOrFail($roundId);
         $actor = $this->actor($request);
         $participant = $this->participant($round->room, $actor);
+
+        $round->room->touch('last_active_at');
 
         if ($round->status !== Round::STATUS_IN_PROGRESS) {
             return response()->json(['message' => 'Round not accepting questions'], 422);
@@ -272,6 +278,13 @@ class RoundController extends Controller
         $actor = $this->actor($request);
         $participant = $this->participant($round->room, $actor);
 
+        $round->room->touch('last_active_at');
+
+        // Status check - must be in progress
+        if ($round->status !== Round::STATUS_IN_PROGRESS) {
+            return response()->json(['message' => 'Round not in progress'], 422);
+        }
+
         $data = $request->validate([
             'question_id' => 'required|integer|exists:round_questions,id',
             'text' => 'required|string|min:1|max:500',
@@ -347,6 +360,8 @@ class RoundController extends Controller
         $actor = $this->actor($request);
         $participant = $this->participant($round->room, $actor);
 
+        $round->room->touch('last_active_at');
+
         // Mark participant as ready for voting
         $participant->ready_for_voting_at = now();
         $participant->save();
@@ -391,6 +406,8 @@ class RoundController extends Controller
         $round = Round::with(['room.participants'])->findOrFail($roundId);
         $actor = $this->actor($request);
         $participant = $this->participant($round->room, $actor);
+
+        $round->room->touch('last_active_at');
 
         $data = $request->validate([
             'target_participant_id' => 'required|integer|exists:room_participants,id',
@@ -459,6 +476,13 @@ class RoundController extends Controller
         $actor = $this->actor($request);
         $participant = $this->participant($round->room, $actor);
 
+        $round->room->touch('last_active_at');
+
+        // Status check - must be in voting phase
+        if ($round->status !== Round::STATUS_VOTING) {
+            return response()->json(['message' => 'Not in voting phase'], 422);
+        }
+
         if ($round->imposter_participant_id !== $participant->id) {
             return response()->json(['message' => 'Only imposter can guess'], 403);
         }
@@ -508,6 +532,13 @@ class RoundController extends Controller
         $round = Round::with('room.participants')->findOrFail($roundId);
         $actor = $this->actor($request);
         $participant = $this->participant($round->room, $actor);
+
+        $round->room->touch('last_active_at');
+
+        // Status check - must be in voting phase
+        if ($round->status !== Round::STATUS_VOTING) {
+            return response()->json(['message' => 'Not in voting phase'], 422);
+        }
 
         if ($round->imposter_participant_id !== $participant->id) {
             return response()->json(['message' => 'Only imposter can skip'], 403);
@@ -643,6 +674,14 @@ class RoundController extends Controller
     private function scoreRound(Round $round): void
     {
         DB::transaction(function () use ($round) {
+            // IDEMPOTENCY CHECK: Refresh and verify round isn't already scoring/ended
+            $round->refresh();
+
+            if ($round->status === Round::STATUS_SCORING || $round->status === Round::STATUS_ENDED) {
+                // Already scored or scoring, skip silently
+                return;
+            }
+
             $round->update(['status' => Round::STATUS_SCORING]);
 
             $imposterId = $round->imposter_participant_id;

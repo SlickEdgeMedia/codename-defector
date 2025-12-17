@@ -17,11 +17,13 @@ class RoomParticipant extends Model
         'nickname',
         'is_host',
         'ready_at',
+        'ready_for_voting_at',
     ];
 
     protected $casts = [
         'is_host' => 'boolean',
         'ready_at' => 'datetime',
+        'ready_for_voting_at' => 'datetime',
     ];
 
     public function room(): BelongsTo

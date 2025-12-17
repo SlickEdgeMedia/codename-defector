@@ -109,7 +109,7 @@ class RoundRepository {
   Future<RoundResults> fetchResults(int roundId) async {
     final response =
         await _api.get<Map<String, dynamic>>('/rounds/$roundId/results');
-    print('🔵 fetchResults API response: ${response.data}');
+    // Fetch results API response received
     return RoundResults.fromJson(response.data ?? {});
   }
 }

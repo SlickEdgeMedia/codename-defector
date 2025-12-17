@@ -23,6 +23,7 @@ class RoomParticipantResource extends JsonResource
             'nickname' => $this->nickname,
             'is_host' => $this->is_host,
             'ready_at' => $this->ready_at?->toIso8601String(),
+            'ready_for_voting_at' => $this->ready_for_voting_at?->toIso8601String(),
             'user' => $this->whenLoaded('user', fn () => [
                 'id' => $this->user->id,
                 'name' => $this->user->name,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:imposter_app/constants/avatars.dart';
 import 'package:imposter_app/constants/palette.dart';
 import 'package:imposter_app/models/room.dart';
+import 'package:imposter_app/models/round_models.dart';
 import 'package:imposter_app/state/app_state.dart';
 import 'package:imposter_app/widgets/buttons/primary_mission_button.dart';
 import 'package:imposter_app/widgets/buttons/secondary_mission_button.dart';
@@ -70,6 +71,25 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
           )
         : null;
     final isMyTurn = askerId != null && askerId == participant?.id;
+
+    // Find who is currently answering (target of current question)
+    RoundQuestionItem? currentQuestion;
+    try {
+      currentQuestion = widget.state.roundQuestions.firstWhere(
+        (q) => q.id == widget.state.currentQuestionId,
+      );
+    } catch (e) {
+      // Question not found, that's okay
+      currentQuestion = null;
+    }
+    final answererId = currentQuestion?.targetId;
+    final answerer = answererId != null
+        ? widget.room.participants.firstWhere(
+            (p) => p.id == answererId,
+            orElse: () => participant ?? widget.room.participants.first,
+          )
+        : null;
+    final isMyAnsweringTurn = answererId != null && answererId == participant?.id;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -140,9 +160,13 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
                                     ? 'Answering agent timed out'
                                     : isMyTurn
                                         ? 'Interrogate an agent'
-                                        : asker != null
-                                            ? '${asker.nickname} is interrogating'
-                                            : 'Waiting for game to start',
+                                        : !widget.state.isAskingPhase && isMyAnsweringTurn
+                                            ? 'Your turn to answer'
+                                            : !widget.state.isAskingPhase && answerer != null
+                                                ? '${answerer.nickname} is answering'
+                                                : asker != null
+                                                    ? '${asker.nickname} is interrogating'
+                                                    : 'Waiting for game to start',
                         style: TextStyle(
                           color: widget.state.turnTimedOut
                               ? Palette.danger

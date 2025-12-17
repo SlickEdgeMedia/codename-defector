@@ -31,7 +31,9 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('rooms', function (Request $request) {
-            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+            // Higher limit for gameplay - rapid questions/answers during active games
+            // 300 requests per minute = ~5 requests per second (sufficient for fast gameplay)
+            return Limit::perMinute(300)->by($request->user()?->id ?: $request->ip());
         });
     }
 }

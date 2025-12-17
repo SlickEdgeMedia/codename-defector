@@ -31,8 +31,10 @@ Route::middleware('auth.mixed')->group(function () {
         Route::get('/rounds/{roundId}/role', [RoundController::class, 'role']);
         Route::post('/rounds/{roundId}/questions', [RoundController::class, 'askQuestion']);
         Route::post('/rounds/{roundId}/answers', [RoundController::class, 'answerQuestion']);
+        Route::post('/rounds/{roundId}/ready-for-voting', [RoundController::class, 'readyForVoting']);
         Route::post('/rounds/{roundId}/votes', [RoundController::class, 'vote']);
         Route::post('/rounds/{roundId}/guess', [RoundController::class, 'imposterGuess']);
+        Route::post('/rounds/{roundId}/skip-guess', [RoundController::class, 'skipGuess']);
         Route::get('/rounds/{roundId}/results', [RoundController::class, 'results']);
     });
 });
