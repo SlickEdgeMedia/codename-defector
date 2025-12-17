@@ -72,12 +72,15 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
     final isMyTurn = askerId != null && askerId == participant?.id;
 
     // Find who is currently answering (target of current question)
-    final currentQuestion = widget.state.pendingQuestions.firstWhere(
-      (q) => q.id == widget.state.currentQuestionId,
-      orElse: () => widget.state.pendingQuestions.isNotEmpty
-          ? widget.state.pendingQuestions.first
-          : null,
-    );
+    RoundQuestionItem? currentQuestion;
+    try {
+      currentQuestion = widget.state.pendingQuestions.firstWhere(
+        (q) => q.id == widget.state.currentQuestionId,
+      );
+    } catch (e) {
+      // Question not found, that's okay
+      currentQuestion = null;
+    }
     final answererId = currentQuestion?.targetId;
     final answerer = answererId != null
         ? widget.room.participants.firstWhere(
