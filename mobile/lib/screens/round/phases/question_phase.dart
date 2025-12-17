@@ -89,6 +89,7 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
             orElse: () => participant ?? widget.room.participants.first,
           )
         : null;
+    final isMyAnsweringTurn = answererId != null && answererId == participant?.id;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -159,11 +160,13 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
                                     ? 'Answering agent timed out'
                                     : isMyTurn
                                         ? 'Interrogate an agent'
-                                        : !widget.state.isAskingPhase && answerer != null
-                                            ? '${answerer.nickname} is answering'
-                                            : asker != null
-                                                ? '${asker.nickname} is interrogating'
-                                                : 'Waiting for game to start',
+                                        : !widget.state.isAskingPhase && isMyAnsweringTurn
+                                            ? 'Your turn to answer'
+                                            : !widget.state.isAskingPhase && answerer != null
+                                                ? '${answerer.nickname} is answering'
+                                                : asker != null
+                                                    ? '${asker.nickname} is interrogating'
+                                                    : 'Waiting for game to start',
                         style: TextStyle(
                           color: widget.state.turnTimedOut
                               ? Palette.danger
