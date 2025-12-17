@@ -724,6 +724,7 @@ class AppState extends ChangeNotifier {
           break;
         case 'round.results':
           roundPhase = 'results';
+          _stopMissionTimer(); // Stop mission timer when results are shown
           final roundId = (payload?['round_id'] as num?)?.toInt();
           fetchResults(roundId);
           break;
@@ -776,6 +777,7 @@ class AppState extends ChangeNotifier {
       // If round is scoring or ended, show results
       if (newStatus == 'scoring' || newStatus == 'ended') {
         roundPhase = 'results';
+        _stopMissionTimer(); // Stop mission timer when results are shown
       }
     }
 

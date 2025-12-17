@@ -71,6 +71,21 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
         : null;
     final isMyTurn = askerId != null && askerId == participant?.id;
 
+    // Find who is currently answering (target of current question)
+    final currentQuestion = widget.state.pendingQuestions.firstWhere(
+      (q) => q.id == widget.state.currentQuestionId,
+      orElse: () => widget.state.pendingQuestions.isNotEmpty
+          ? widget.state.pendingQuestions.first
+          : null,
+    );
+    final answererId = currentQuestion?.targetId;
+    final answerer = answererId != null
+        ? widget.room.participants.firstWhere(
+            (p) => p.id == answererId,
+            orElse: () => participant ?? widget.room.participants.first,
+          )
+        : null;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -140,9 +155,11 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
                                     ? 'Answering agent timed out'
                                     : isMyTurn
                                         ? 'Interrogate an agent'
-                                        : asker != null
-                                            ? '${asker.nickname} is interrogating'
-                                            : 'Waiting for game to start',
+                                        : !widget.state.isAskingPhase && answerer != null
+                                            ? '${answerer.nickname} is answering'
+                                            : asker != null
+                                                ? '${asker.nickname} is interrogating'
+                                                : 'Waiting for game to start',
                         style: TextStyle(
                           color: widget.state.turnTimedOut
                               ? Palette.danger
