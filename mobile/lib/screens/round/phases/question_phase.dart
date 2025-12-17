@@ -75,7 +75,7 @@ class _QuestionPhaseState extends State<QuestionPhase> with TickerProviderStateM
     // Find who is currently answering (target of current question)
     RoundQuestionItem? currentQuestion;
     try {
-      currentQuestion = widget.state.pendingQuestions.firstWhere(
+      currentQuestion = widget.state.roundQuestions.firstWhere(
         (q) => q.id == widget.state.currentQuestionId,
       );
     } catch (e) {
